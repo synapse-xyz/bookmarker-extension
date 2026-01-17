@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notion URL Saver</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <!-- Vista de Onboarding -->
+  <div id="onboarding-view" class="view hidden">
+    <div class="container">
+      <h1>Configuración Inicial</h1>
+      <p class="subtitle">Conecta tu extensión con Notion</p>
+      
+      <form id="onboarding-form">
+        <div class="form-group">
+          <label for="api-key">Notion API Key</label>
+          <input 
+            type="password" 
+            id="api-key" 
+            placeholder="secret_xxxxxxxxxxxxx" 
+            required
+          >
+          <small class="help-text">
+            Obtén tu API key en <a href="https://www.notion.so/my-integrations" target="_blank">Notion Integrations</a>
+          </small>
+        </div>
+        
+        <div class="form-group">
+          <label for="database-id">Database ID</label>
+          <input 
+            type="text" 
+            id="database-id" 
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
+            required
+          >
+          <small class="help-text">
+            El ID de tu base de datos de Notion (UUID)
+          </small>
+        </div>
+        
+        <div id="error-message" class="error-message hidden"></div>
+        
+        <button type="submit" id="save-config-btn" class="btn btn-primary">
+          Guardar Configuración
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Vista Principal -->
+  <div id="main-view" class="view hidden">
+    <div class="container">
+      <h1>Guardar URL</h1>
+      
+      <div id="status-message" class="status-message hidden"></div>
+      
+      <div class="url-preview">
+        <p class="url-text" id="current-url">Cargando...</p>
+      </div>
+      
+      <button id="save-url-btn" class="btn btn-primary">
+        Guardar URL en Notion
+      </button>
+      
+      <button id="change-config-btn" class="btn btn-secondary">
+        Cambiar Configuración
+      </button>
+    </div>
+  </div>
+
+  <script src="notion-api.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
