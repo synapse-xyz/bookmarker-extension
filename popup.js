@@ -10,12 +10,15 @@ const saveUrlBtn = document.getElementById('save-url-btn');
 const changeConfigBtn = document.getElementById('change-config-btn');
 const statusMessage = document.getElementById('status-message');
 const currentUrlElement = document.getElementById('current-url');
+const labelSelect = document.getElementById('label-select');
 
 // Estado
 let isLoading = false;
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', async () => {
+  // Capturar screenshot antes de mostrar cualquier vista
+  await captureScreenshot();
   await checkOnboardingStatus();
   setupEventListeners();
 });
@@ -28,7 +31,7 @@ async function checkOnboardingStatus() {
     const result = await chrome.storage.local.get(['notionApiKey', 'notionDatabaseId']);
     
     if (result.notionApiKey && result.notionDatabaseId) {
-      showMainView();
+      await showMainView();
       await loadCurrentTabURL();
     } else {
       showOnboardingView();
@@ -52,10 +55,13 @@ function showOnboardingView() {
 /**
  * Muestra la vista principal
  */
-function showMainView() {
+async function showMainView() {
   onboardingView.classList.add('hidden');
   mainView.classList.remove('hidden');
   statusMessage.classList.add('hidden');
+  
+  // Cargar opciones de label
+  await loadLabelOptions();
 }
 
 /**
@@ -98,7 +104,7 @@ async function handleOnboardingSubmit(e) {
     });
     
     // Mostrar vista principal
-    showMainView();
+    await showMainView();
     await loadCurrentTabURL();
     
   } catch (error) {
@@ -175,11 +181,45 @@ async function handleSaveURL() {
     const url = tab.url;
     const title = tab.title;
     
+    // Obtener label seleccionado
+    const selectedLabel = labelSelect.value || null;
+    
     // Usar el nombre real de la propiedad title (por defecto 'nombre')
     const titlePropertyName = config.notionTitlePropertyName || 'nombre';
     
+    // Extraer dominio para saved_from
+    const domain = extractDomain(url);
+    
+    // Verificar que todas las propiedades requeridas existen antes de crear la página
+    try {
+      const propertiesCheck = await checkDatabaseProperties(config.notionApiKey, config.notionDatabaseId);
+      
+      if (!propertiesCheck.hasAll && propertiesCheck.missing.length > 0) {
+        await addMissingProperties(config.notionApiKey, config.notionDatabaseId, propertiesCheck.missing, propertiesCheck.titlePropertyName);
+      }
+    } catch (error) {
+      console.error('Error verificando propiedades:', error);
+      // Continuar de todas formas, pero puede fallar al crear la página
+    }
+    
+    // Obtener screenshot del storage y subirla directamente a Notion
+    let thumbnailUploadId = null;
+    const storage = await chrome.storage.local.get(['pendingScreenshot', 'screenshotUrl']);
+    
+    if (storage.pendingScreenshot && storage.screenshotUrl === url) {
+      try {
+        // Subir la imagen directamente a Notion
+        thumbnailUploadId = await uploadImageToNotion(config.notionApiKey, storage.pendingScreenshot);
+        // Limpiar screenshot del storage después de subirla exitosamente
+        await chrome.storage.local.remove(['pendingScreenshot', 'screenshotTimestamp', 'screenshotUrl']);
+      } catch (error) {
+        console.error('Error procesando screenshot:', error);
+        // Continuar sin thumbnail si falla, pero no bloquear el guardado de la URL
+      }
+    }
+    
     // Crear página en Notion
-    await createPage(config.notionApiKey, config.notionDatabaseId, url, title, null, titlePropertyName);
+    await createPage(config.notionApiKey, config.notionDatabaseId, url, title, selectedLabel, titlePropertyName, domain, thumbnailUploadId);
     
     showStatus('¡URL guardada exitosamente en Notion!', 'success');
     
@@ -230,6 +270,64 @@ async function loadCurrentTabURL() {
   } catch (error) {
     console.error('Error loading current tab URL:', error);
     currentUrlElement.textContent = 'Error al cargar la URL';
+  }
+}
+
+/**
+ * Captura una screenshot de la pestaña actual
+ */
+async function captureScreenshot() {
+  try {
+    const tab = await getCurrentTab();
+    if (!tab || !tab.id) {
+      return;
+    }
+    
+    // Capturar screenshot de la pestaña visible
+    const dataUrl = await chrome.tabs.captureVisibleTab(null, {
+      format: 'png',
+      quality: 90
+    });
+    
+    // Guardar screenshot temporalmente en storage
+    await chrome.storage.local.set({
+      pendingScreenshot: dataUrl,
+      screenshotTimestamp: Date.now(),
+      screenshotUrl: tab.url
+    });
+  } catch (error) {
+    console.error('Error capturando screenshot:', error);
+    // Continuar de todas formas, la extensión puede funcionar sin screenshot
+  }
+}
+
+/**
+ * Carga las opciones de label desde Notion
+ */
+async function loadLabelOptions() {
+  try {
+    const config = await chrome.storage.local.get(['notionApiKey', 'notionDatabaseId']);
+    
+    if (!config.notionApiKey || !config.notionDatabaseId) {
+      return;
+    }
+    
+    // Limpiar opciones existentes (excepto "Sin categoría")
+    labelSelect.innerHTML = '<option value="">Sin categoría</option>';
+    
+    // Obtener opciones de label desde Notion
+    const options = await getLabelOptions(config.notionApiKey, config.notionDatabaseId);
+    
+    // Agregar opciones al select
+    options.forEach(option => {
+      const optionElement = document.createElement('option');
+      optionElement.value = option;
+      optionElement.textContent = option;
+      labelSelect.appendChild(optionElement);
+    });
+  } catch (error) {
+    console.error('Error loading label options:', error);
+    // Si hay error, mantener solo "Sin categoría"
   }
 }
 

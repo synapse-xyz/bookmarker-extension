@@ -74,7 +74,9 @@ async function checkDatabaseProperties(apiKey, databaseId) {
     const required = {
       nombre: { type: 'title', exists: false, actualName: null },
       url: { type: 'url', exists: false },
-      label: { type: 'select', exists: false }
+      label: { type: 'select', exists: false },
+      saved_from: { type: 'rich_text', exists: false },
+      thumbnail: { type: 'files', exists: false }
     };
 
     // Buscar propiedad de tipo "title" (siempre existe una por defecto en Notion)
@@ -105,11 +107,15 @@ async function checkDatabaseProperties(apiKey, databaseId) {
         required.url.exists = true;
       } else if (propName === 'label' && prop.type === 'select') {
         required.label.exists = true;
+      } else if (propName === 'saved_from' && (prop.type === 'rich_text' || prop.type === 'text')) {
+        required.saved_from.exists = true;
+      } else if (propName === 'thumbnail' && prop.type === 'files') {
+        required.thumbnail.exists = true;
       }
     }
 
     return {
-      hasAll: required.nombre.exists && required.url.exists && required.label.exists,
+      hasAll: required.nombre.exists && required.url.exists && required.label.exists && required.saved_from.exists && required.thumbnail.exists,
       missing: Object.keys(required).filter(key => !required[key].exists),
       titlePropertyName: required.nombre.actualName || titlePropertyName,
       database
@@ -155,6 +161,16 @@ async function addMissingProperties(apiKey, databaseId, missingProperties, title
             }
           };
           break;
+        case 'saved_from':
+          properties.saved_from = {
+            rich_text: {}
+          };
+          break;
+        case 'thumbnail':
+          properties.thumbnail = {
+            files: {}
+          };
+          break;
       }
     }
 
@@ -187,9 +203,104 @@ async function addMissingProperties(apiKey, databaseId, missingProperties, title
 }
 
 /**
+ * Obtiene las opciones disponibles del select "label"
+ */
+async function getLabelOptions(apiKey, databaseId) {
+  try {
+    const database = await getDatabase(apiKey, databaseId);
+    const properties = database.properties || {};
+    
+    if (properties.label && properties.label.type === 'select') {
+      const options = properties.label.select.options || [];
+      return options.map(option => option.name);
+    }
+    
+    return [];
+  } catch (error) {
+    throw new Error(`Error al obtener opciones de label: ${error.message}`);
+  }
+}
+
+/**
+ * Extrae el dominio de una URL
+ */
+function extractDomain(url) {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace('www.', '');
+  } catch (error) {
+    // Si no es una URL válida, intentar extraer dominio básico
+    const match = url.match(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/);
+    return match ? match[1] : 'unknown';
+  }
+}
+
+/**
+ * Convierte data URL a blob
+ */
+function dataURLtoBlob(dataURL) {
+  const arr = dataURL.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+}
+
+/**
+ * Sube una imagen directamente a Notion usando su API de upload
+ * Retorna el upload_id que se puede usar en la propiedad files
+ */
+async function uploadImageToNotion(apiKey, dataURL) {
+  try {
+    // Paso 1: Crear un objeto de upload
+    const createUploadResponse = await notionRequest(apiKey, '/file_uploads', 'POST', {
+      mode: 'single_part'
+    });
+    
+    const uploadId = createUploadResponse.id;
+    const sendUrl = createUploadResponse.upload_url || `${NOTION_API_BASE}/file_uploads/${uploadId}/send`;
+    
+    // Paso 2: Convertir data URL a blob
+    const blob = dataURLtoBlob(dataURL);
+    
+    // Paso 3: Subir el archivo usando multipart/form-data
+    const formData = new FormData();
+    formData.append('file', blob, 'screenshot.png');
+    
+    const uploadResponse = await fetch(sendUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Notion-Version': NOTION_VERSION
+        // NO incluir Content-Type aquí, el navegador lo maneja automáticamente con el boundary
+      },
+      body: formData
+    });
+    
+    if (!uploadResponse.ok) {
+      const errorData = await uploadResponse.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(errorData.message || `Error al subir el archivo: ${uploadResponse.status}`);
+    }
+    
+    // Paso 4: Verificar el estado del upload
+    const uploadStatus = await uploadResponse.json().catch(() => ({}));
+    
+    // Retornar el upload_id para usarlo en la propiedad files
+    return uploadId;
+  } catch (error) {
+    console.error('Error subiendo imagen a Notion:', error);
+    throw error;
+  }
+}
+
+/**
  * Crea una nueva página en la base de datos con la URL
  */
-async function createPage(apiKey, databaseId, url, title = null, label = null, titlePropertyName = 'nombre') {
+async function createPage(apiKey, databaseId, url, title = null, label = null, titlePropertyName = 'nombre', savedFrom = null, thumbnailUploadId = null) {
   try {
     const pageData = {
       parent: {
@@ -220,6 +331,33 @@ async function createPage(apiKey, databaseId, url, title = null, label = null, t
         select: {
           name: label
         }
+      };
+    }
+
+    // Agregar saved_from con el dominio extraído de la URL
+    const domain = savedFrom || extractDomain(url);
+    pageData.properties.saved_from = {
+      rich_text: [
+        {
+          text: {
+            content: domain
+          }
+        }
+      ]
+    };
+
+    // Agregar thumbnail si se proporciona un upload_id
+    if (thumbnailUploadId) {
+      pageData.properties.thumbnail = {
+        files: [
+          {
+            type: 'file_upload',
+            file_upload: {
+              id: thumbnailUploadId
+            },
+            name: 'screenshot.png'
+          }
+        ]
       };
     }
 
