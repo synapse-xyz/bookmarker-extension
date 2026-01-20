@@ -298,6 +298,31 @@ async function uploadImageToNotion(apiKey, dataURL) {
 }
 
 /**
+ * Obtiene metadatos de la base de datos (nombre y emoji)
+ */
+async function getDatabaseMetadata(apiKey, databaseId) {
+  try {
+    const database = await getDatabase(apiKey, databaseId);
+    const name = database.title?.[0]?.plain_text || 'Sin nombre';
+    
+    // Obtener emoji si existe
+    let emoji = null;
+    if (database.icon) {
+      if (database.icon.type === 'emoji') {
+        emoji = database.icon.emoji;
+      } else {
+        // Si es un icono personalizado (archivo), mostrar "🔲"
+        emoji = '🔲';
+      }
+    }
+    
+    return { name, emoji };
+  } catch (error) {
+    throw new Error(`Error al obtener metadatos de la base de datos: ${error.message}`);
+  }
+}
+
+/**
  * Crea una nueva página en la base de datos con la URL
  */
 async function createPage(apiKey, databaseId, url, title = null, label = null, titlePropertyName = 'nombre', savedFrom = null, thumbnailUploadId = null) {

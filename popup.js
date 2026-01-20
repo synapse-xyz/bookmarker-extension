@@ -1,3 +1,163 @@
+// ============================================
+// STORAGE HELPERS & MIGRATION
+// ============================================
+
+/**
+ * Migra datos del formato antiguo al nuevo formato de perfiles
+ */
+async function migrateOldFormat() {
+  try {
+    const result = await chrome.storage.local.get(['notionApiKey', 'notionDatabaseId']);
+    
+    // Si existen datos del formato antiguo
+    if (result.notionApiKey && result.notionDatabaseId) {
+      // Obtener metadatos de la base de datos
+      let name = 'Base de datos';
+      let emoji = null;
+      
+      try {
+        const metadata = await getDatabaseMetadata(result.notionApiKey, result.notionDatabaseId);
+        name = metadata.name;
+        emoji = metadata.emoji;
+      } catch (error) {
+        console.warn('Error fetching metadata during migration:', error);
+      }
+      
+      // Crear perfil desde datos antiguos
+      const profileId = Date.now().toString();
+      const profile = {
+        id: profileId,
+        apiKey: result.notionApiKey,
+        databaseId: result.notionDatabaseId,
+        name: name,
+        emoji: emoji,
+        titlePropertyName: result.notionTitlePropertyName || 'nombre',
+        labelOptions: []
+      };
+      
+      // Guardar en nuevo formato
+      await chrome.storage.local.set({
+        profiles: [profile],
+        selectedProfileId: profileId
+      });
+      
+      // Limpiar datos antiguos
+      await chrome.storage.local.remove(['notionApiKey', 'notionDatabaseId', 'notionTitlePropertyName']);
+      
+      console.log('Migration completed successfully');
+      return true;
+    }
+  } catch (error) {
+    console.error('Error during migration:', error);
+  }
+  return false;
+}
+
+/**
+ * Obtiene todos los perfiles
+ */
+async function getProfiles() {
+  const result = await chrome.storage.local.get(['profiles']);
+  return result.profiles || [];
+}
+
+/**
+ * Obtiene el perfil seleccionado actualmente
+ */
+async function getSelectedProfile() {
+  const result = await chrome.storage.local.get(['profiles', 'selectedProfileId']);
+  const profiles = result.profiles || [];
+  const selectedId = result.selectedProfileId;
+  
+  if (selectedId && profiles.length > 0) {
+    return profiles.find(p => p.id === selectedId) || null;
+  }
+  return null;
+}
+
+/**
+ * Guarda un perfil (nuevo o actualizado)
+ */
+async function saveProfile(profile) {
+  const profiles = await getProfiles();
+  const index = profiles.findIndex(p => p.id === profile.id);
+  
+  if (index >= 0) {
+    profiles[index] = profile;
+  } else {
+    profiles.push(profile);
+  }
+  
+  await chrome.storage.local.set({ profiles });
+  return profile;
+}
+
+/**
+ * Elimina un perfil
+ */
+async function deleteProfile(profileId) {
+  const profiles = await getProfiles();
+  const result = await chrome.storage.local.get(['selectedProfileId']);
+  
+  const filteredProfiles = profiles.filter(p => p.id !== profileId);
+  
+  // Si el perfil eliminado era el seleccionado, seleccionar otro
+  let newSelectedId = result.selectedProfileId;
+  if (newSelectedId === profileId && filteredProfiles.length > 0) {
+    newSelectedId = filteredProfiles[0].id;
+  } else if (filteredProfiles.length === 0) {
+    newSelectedId = null;
+  }
+  
+  await chrome.storage.local.set({ 
+    profiles: filteredProfiles,
+    selectedProfileId: newSelectedId
+  });
+}
+
+/**
+ * Establece el perfil seleccionado
+ */
+async function setSelectedProfile(profileId) {
+  await chrome.storage.local.set({ selectedProfileId: profileId });
+}
+
+/**
+ * Obtiene opciones de label para el perfil seleccionado
+ */
+async function getSelectedProfileLabelOptions() {
+  const profile = await getSelectedProfile();
+  return profile?.labelOptions || [];
+}
+
+/**
+ * Actualiza metadatos para todos los perfiles (refresh)
+ */
+async function refreshAllProfilesMetadata() {
+  const profiles = await getProfiles();
+  
+  for (let profile of profiles) {
+    try {
+      const metadata = await getDatabaseMetadata(profile.apiKey, profile.databaseId);
+      profile.name = metadata.name;
+      profile.emoji = metadata.emoji;
+      
+      // Obtener opciones de categorías
+      const options = await getLabelOptions(profile.apiKey, profile.databaseId);
+      profile.labelOptions = options;
+    } catch (error) {
+      console.warn(`Error refreshing profile ${profile.id}:`, error);
+    }
+  }
+  
+  await chrome.storage.local.set({ profiles, lastFetched: Date.now() });
+  return profiles;
+}
+
+// ============================================
+// DOM ELEMENTS
+// ============================================
+
 // Referencias a elementos del DOM
 const onboardingView = document.getElementById('onboarding-view');
 const mainView = document.getElementById('main-view');
@@ -7,7 +167,6 @@ const databaseIdInput = document.getElementById('database-id');
 const errorMessage = document.getElementById('error-message');
 const saveConfigBtn = document.getElementById('save-config-btn');
 const saveUrlBtn = document.getElementById('save-url-btn');
-const changeConfigBtn = document.getElementById('change-config-btn');
 const statusMessage = document.getElementById('status-message');
 const currentUrlElement = document.getElementById('current-url');
 const labelSelect = document.getElementById('label-select');
@@ -19,6 +178,7 @@ let isLoading = false;
 document.addEventListener('DOMContentLoaded', async () => {
   // Capturar screenshot antes de mostrar cualquier vista
   await captureScreenshot();
+  await migrateOldFormat();
   await checkOnboardingStatus();
   setupEventListeners();
 });
@@ -28,9 +188,9 @@ document.addEventListener('DOMContentLoaded', async () => {
  */
 async function checkOnboardingStatus() {
   try {
-    const result = await chrome.storage.local.get(['notionApiKey', 'notionDatabaseId']);
+    const profiles = await getProfiles();
     
-    if (result.notionApiKey && result.notionDatabaseId) {
+    if (profiles && profiles.length > 0) {
       await showMainView();
       await loadCurrentTabURL();
     } else {
@@ -60,7 +220,10 @@ async function showMainView() {
   mainView.classList.remove('hidden');
   statusMessage.classList.add('hidden');
   
-  // Cargar opciones de label
+  // Renderizar perfiles en sidebar
+  await renderProfiles();
+  
+  // Cargar opciones de label del perfil seleccionado
   await loadLabelOptions();
 }
 
@@ -68,9 +231,69 @@ async function showMainView() {
  * Configura los event listeners
  */
 function setupEventListeners() {
+  // Onboarding
   onboardingForm.addEventListener('submit', handleOnboardingSubmit);
+  
+  // Main view
   saveUrlBtn.addEventListener('click', handleSaveURL);
-  changeConfigBtn.addEventListener('click', handleChangeConfig);
+  
+  // Refresh button
+  const refreshBtn = document.getElementById('refresh-btn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', handleRefresh);
+  }
+  
+  // Add Profile button & modal
+  const addProfileBtn = document.getElementById('add-profile-btn');
+  if (addProfileBtn) {
+    addProfileBtn.addEventListener('click', openAddProfileModal);
+  }
+  
+  const addProfileForm = document.getElementById('add-profile-form');
+  if (addProfileForm) {
+    addProfileForm.addEventListener('submit', handleAddProfileSubmit);
+  }
+  
+  const closeAddModalBtn = document.getElementById('close-add-modal');
+  if (closeAddModalBtn) {
+    closeAddModalBtn.addEventListener('click', closeAddProfileModal);
+  }
+  
+  const cancelAddModalBtn = document.getElementById('cancel-add-modal');
+  if (cancelAddModalBtn) {
+    cancelAddModalBtn.addEventListener('click', closeAddProfileModal);
+  }
+  
+  const addModalOverlay = document.getElementById('modal-overlay-add');
+  if (addModalOverlay) {
+    addModalOverlay.addEventListener('click', closeAddProfileModal);
+  }
+  
+  // Config button & modal
+  const configBtn = document.getElementById('config-btn');
+  if (configBtn) {
+    configBtn.addEventListener('click', openSettingsModal);
+  }
+  
+  const settingsForm = document.getElementById('settings-form');
+  if (settingsForm) {
+    settingsForm.addEventListener('submit', handleSettingsSubmit);
+  }
+  
+  const closeSettingsModalBtn = document.getElementById('close-settings-modal');
+  if (closeSettingsModalBtn) {
+    closeSettingsModalBtn.addEventListener('click', closeSettingsModal);
+  }
+  
+  const cancelSettingsModalBtn = document.getElementById('cancel-settings-modal');
+  if (cancelSettingsModalBtn) {
+    cancelSettingsModalBtn.addEventListener('click', closeSettingsModal);
+  }
+  
+  const settingsModalOverlay = document.getElementById('modal-overlay-settings');
+  if (settingsModalOverlay) {
+    settingsModalOverlay.addEventListener('click', closeSettingsModal);
+  }
 }
 
 /**
@@ -97,15 +320,32 @@ async function handleOnboardingSubmit(e) {
     // Validar configuración de Notion
     await validateNotionConfig(apiKey, databaseId);
     
-    // Guardar configuración
-    await chrome.storage.local.set({
-      notionApiKey: apiKey,
-      notionDatabaseId: databaseId
-    });
+    // Obtener metadatos de la base de datos
+    const metadata = await getDatabaseMetadata(apiKey, databaseId);
+    
+    // Crear nuevo perfil
+    const profileId = Date.now().toString();
+    const profile = {
+      id: profileId,
+      apiKey: apiKey,
+      databaseId: databaseId,
+      name: metadata.name,
+      emoji: metadata.emoji,
+      titlePropertyName: 'nombre',
+      labelOptions: []
+    };
+    
+    // Guardar perfil
+    await saveProfile(profile);
+    await setSelectedProfile(profileId);
     
     // Mostrar vista principal
     await showMainView();
     await loadCurrentTabURL();
+    
+    // Limpiar formulario
+    apiKeyInput.value = '';
+    databaseIdInput.value = '';
     
   } catch (error) {
     showError(error.message || 'Error al validar la configuración');
@@ -167,12 +407,11 @@ async function handleSaveURL() {
   hideStatus();
   
   try {
-    // Obtener configuración
-    const config = await chrome.storage.local.get(['notionApiKey', 'notionDatabaseId', 'notionTitlePropertyName']);
+    // Obtener perfil seleccionado
+    const profile = await getSelectedProfile();
     
-    if (!config.notionApiKey || !config.notionDatabaseId) {
-      showStatus('Error: Configuración no encontrada', 'error');
-      showOnboardingView();
+    if (!profile) {
+      showStatus('Error: No hay perfil seleccionado', 'error');
       return;
     }
     
@@ -184,18 +423,15 @@ async function handleSaveURL() {
     // Obtener label seleccionado
     const selectedLabel = labelSelect.value || null;
     
-    // Usar el nombre real de la propiedad title (por defecto 'nombre')
-    const titlePropertyName = config.notionTitlePropertyName || 'nombre';
-    
     // Extraer dominio para saved_from
     const domain = extractDomain(url);
     
     // Verificar que todas las propiedades requeridas existen antes de crear la página
     try {
-      const propertiesCheck = await checkDatabaseProperties(config.notionApiKey, config.notionDatabaseId);
+      const propertiesCheck = await checkDatabaseProperties(profile.apiKey, profile.databaseId);
       
       if (!propertiesCheck.hasAll && propertiesCheck.missing.length > 0) {
-        await addMissingProperties(config.notionApiKey, config.notionDatabaseId, propertiesCheck.missing, propertiesCheck.titlePropertyName);
+        await addMissingProperties(profile.apiKey, profile.databaseId, propertiesCheck.missing, propertiesCheck.titlePropertyName);
       }
     } catch (error) {
       console.error('Error verificando propiedades:', error);
@@ -209,7 +445,7 @@ async function handleSaveURL() {
     if (storage.pendingScreenshot && storage.screenshotUrl === url) {
       try {
         // Subir la imagen directamente a Notion
-        thumbnailUploadId = await uploadImageToNotion(config.notionApiKey, storage.pendingScreenshot);
+        thumbnailUploadId = await uploadImageToNotion(profile.apiKey, storage.pendingScreenshot);
         // Limpiar screenshot del storage después de subirla exitosamente
         await chrome.storage.local.remove(['pendingScreenshot', 'screenshotTimestamp', 'screenshotUrl']);
       } catch (error) {
@@ -219,7 +455,7 @@ async function handleSaveURL() {
     }
     
     // Crear página en Notion
-    await createPage(config.notionApiKey, config.notionDatabaseId, url, title, selectedLabel, titlePropertyName, domain, thumbnailUploadId);
+    await createPage(profile.apiKey, profile.databaseId, url, title, selectedLabel, profile.titlePropertyName, domain, thumbnailUploadId);
     
     showStatus('¡URL guardada exitosamente en Notion!', 'success');
     
@@ -233,20 +469,7 @@ async function handleSaveURL() {
   }
 }
 
-/**
- * Maneja el cambio de configuración
- */
-function handleChangeConfig() {
-  // Limpiar configuración
-  chrome.storage.local.remove(['notionApiKey', 'notionDatabaseId']);
-  
-  // Limpiar formulario
-  apiKeyInput.value = '';
-  databaseIdInput.value.trim();
-  
-  // Mostrar onboarding
-  showOnboardingView();
-}
+
 
 /**
  * Obtiene la pestaña actual
@@ -302,13 +525,14 @@ async function captureScreenshot() {
 }
 
 /**
- * Carga las opciones de label desde Notion
+ * Carga las opciones de label desde Notion para el perfil seleccionado
  */
 async function loadLabelOptions() {
   try {
-    const config = await chrome.storage.local.get(['notionApiKey', 'notionDatabaseId']);
+    const profile = await getSelectedProfile();
     
-    if (!config.notionApiKey || !config.notionDatabaseId) {
+    if (!profile) {
+      labelSelect.innerHTML = '<option value="">Sin categoría</option>';
       return;
     }
     
@@ -316,7 +540,7 @@ async function loadLabelOptions() {
     labelSelect.innerHTML = '<option value="">Sin categoría</option>';
     
     // Obtener opciones de label desde Notion
-    const options = await getLabelOptions(config.notionApiKey, config.notionDatabaseId);
+    const options = await getLabelOptions(profile.apiKey, profile.databaseId);
     
     // Agregar opciones al select
     options.forEach(option => {
@@ -379,5 +603,336 @@ function setLoading(loading) {
   } else {
     saveConfigBtn.textContent = 'Guardar Configuración';
     saveUrlBtn.textContent = 'Guardar URL en Notion';
+  }
+}
+
+// ============================================
+// PROFILE RENDERING & SELECTION
+// ============================================
+
+/**
+ * Renderiza la lista de perfiles en el sidebar
+ */
+async function renderProfiles() {
+  const profiles = await getProfiles();
+  const selectedProfileId = (await chrome.storage.local.get(['selectedProfileId'])).selectedProfileId;
+  const profileList = document.getElementById('profile-list');
+  
+  if (!profileList) return;
+  
+  profileList.innerHTML = '';
+  
+  for (const profile of profiles) {
+    const profileItem = document.createElement('div');
+    profileItem.className = 'profile-item';
+    if (profile.id === selectedProfileId) {
+      profileItem.classList.add('selected');
+    }
+    
+    const emoji = profile.emoji || '🔲';
+    const name = profile.name || 'Sin nombre';
+    
+    profileItem.innerHTML = `
+      <div class="profile-item-name">
+        <span class="profile-emoji">${emoji}</span>
+        <span>${name}</span>
+      </div>
+      <button type="button" class="profile-delete-btn" data-profile-id="${profile.id}">&times;</button>
+    `;
+    
+    // Click para seleccionar perfil
+    const nameArea = profileItem.querySelector('.profile-item-name');
+    nameArea.addEventListener('click', async () => {
+      await selectProfile(profile.id);
+    });
+    
+    // Click para eliminar perfil
+    const deleteBtn = profileItem.querySelector('.profile-delete-btn');
+    deleteBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await handleDeleteProfile(profile.id);
+    });
+    
+    profileList.appendChild(profileItem);
+  }
+}
+
+/**
+ * Selecciona un perfil
+ */
+async function selectProfile(profileId) {
+  await setSelectedProfile(profileId);
+  await renderProfiles();
+  await loadLabelOptions();
+}
+
+/**
+ * Maneja la eliminación de un perfil
+ */
+async function handleDeleteProfile(profileId) {
+  const profiles = await getProfiles();
+  const profile = profiles.find(p => p.id === profileId);
+  
+  if (!profile) return;
+  
+  // Confirmar eliminación
+  const confirmed = confirm(`¿Estás seguro de que deseas eliminar el perfil "${profile.name || 'Sin nombre'}"?`);
+  if (!confirmed) return;
+  
+  await deleteProfile(profileId);
+  await renderProfiles();
+  await loadLabelOptions();
+}
+
+// ============================================
+// MODAL: ADD PROFILE
+// ============================================
+
+/**
+ * Abre el modal para añadir perfil
+ */
+function openAddProfileModal() {
+  const modal = document.getElementById('add-profile-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+  }
+}
+
+/**
+ * Cierra el modal para añadir perfil
+ */
+function closeAddProfileModal() {
+  const modal = document.getElementById('add-profile-modal');
+  const form = document.getElementById('add-profile-form');
+  const errorDiv = document.getElementById('modal-error');
+  
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+  if (form) {
+    form.reset();
+  }
+  if (errorDiv) {
+    errorDiv.classList.add('hidden');
+    errorDiv.textContent = '';
+  }
+}
+
+/**
+ * Maneja el submit del formulario para añadir perfil
+ */
+async function handleAddProfileSubmit(e) {
+  e.preventDefault();
+  
+  const apiKeyInput = document.getElementById('modal-api-key');
+  const dbIdInput = document.getElementById('modal-db-id');
+  const errorDiv = document.getElementById('modal-error');
+  
+  const apiKey = apiKeyInput.value.trim();
+  const databaseId = dbIdInput.value.trim();
+  
+  if (!apiKey || !databaseId) {
+    showModalError('modal-error', 'Por favor, completa todos los campos');
+    return;
+  }
+  
+  try {
+    showModalError('modal-error', '', true); // Limpiar errores
+    
+    // Validar configuración de Notion
+    await validateNotionConfig(apiKey, databaseId);
+    
+    // Obtener metadatos de la base de datos
+    const metadata = await getDatabaseMetadata(apiKey, databaseId);
+    
+    // Obtener opciones de categorías
+    const labelOptions = await getLabelOptions(apiKey, databaseId);
+    
+    // Crear nuevo perfil
+    const profileId = Date.now().toString();
+    const profile = {
+      id: profileId,
+      apiKey: apiKey,
+      databaseId: databaseId,
+      name: metadata.name,
+      emoji: metadata.emoji,
+      titlePropertyName: 'nombre',
+      labelOptions: labelOptions
+    };
+    
+    // Guardar perfil
+    await saveProfile(profile);
+    await setSelectedProfile(profileId);
+    
+    // Actualizar vista
+    await renderProfiles();
+    await loadLabelOptions();
+    
+    // Cerrar modal
+    closeAddProfileModal();
+    
+  } catch (error) {
+    showModalError('modal-error', error.message || 'Error al agregar perfil');
+  }
+}
+
+// ============================================
+// MODAL: SETTINGS
+// ============================================
+
+/**
+ * Abre el modal de configuración
+ */
+async function openSettingsModal() {
+  const modal = document.getElementById('settings-modal');
+  const profile = await getSelectedProfile();
+  
+  if (!profile) return;
+  
+  // Pre-llenar los campos con los datos del perfil actual
+  const apiKeyInput = document.getElementById('settings-api-key');
+  const dbIdInput = document.getElementById('settings-db-id');
+  
+  if (apiKeyInput) {
+    apiKeyInput.value = profile.apiKey;
+  }
+  if (dbIdInput) {
+    dbIdInput.value = profile.databaseId;
+  }
+  
+  if (modal) {
+    modal.classList.remove('hidden');
+  }
+}
+
+/**
+ * Cierra el modal de configuración
+ */
+function closeSettingsModal() {
+  const modal = document.getElementById('settings-modal');
+  const form = document.getElementById('settings-form');
+  const errorDiv = document.getElementById('settings-error');
+  
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+  if (form) {
+    form.reset();
+  }
+  if (errorDiv) {
+    errorDiv.classList.add('hidden');
+    errorDiv.textContent = '';
+  }
+}
+
+/**
+ * Maneja el submit del formulario de configuración
+ */
+async function handleSettingsSubmit(e) {
+  e.preventDefault();
+  
+  const apiKeyInput = document.getElementById('settings-api-key');
+  const dbIdInput = document.getElementById('settings-db-id');
+  
+  const apiKey = apiKeyInput.value.trim();
+  const databaseId = dbIdInput.value.trim();
+  
+  if (!apiKey || !databaseId) {
+    showModalError('settings-error', 'Por favor, completa todos los campos');
+    return;
+  }
+  
+  try {
+    showModalError('settings-error', '', true); // Limpiar errores
+    
+    // Validar nueva configuración
+    await validateNotionConfig(apiKey, databaseId);
+    
+    // Obtener perfil actual
+    const profile = await getSelectedProfile();
+    if (!profile) return;
+    
+    // Obtener nuevos metadatos
+    const metadata = await getDatabaseMetadata(apiKey, databaseId);
+    const labelOptions = await getLabelOptions(apiKey, databaseId);
+    
+    // Actualizar perfil
+    profile.apiKey = apiKey;
+    profile.databaseId = databaseId;
+    profile.name = metadata.name;
+    profile.emoji = metadata.emoji;
+    profile.labelOptions = labelOptions;
+    
+    // Guardar cambios
+    await saveProfile(profile);
+    
+    // Actualizar vista
+    await renderProfiles();
+    await loadLabelOptions();
+    
+    // Cerrar modal
+    closeSettingsModal();
+    
+  } catch (error) {
+    showModalError('settings-error', error.message || 'Error al guardar cambios');
+  }
+}
+
+// ============================================
+// REFRESH FUNCTIONALITY
+// ============================================
+
+/**
+ * Maneja el click del botón refresh
+ */
+async function handleRefresh() {
+  const refreshBtn = document.getElementById('refresh-btn');
+  
+  if (isLoading) return;
+  
+  try {
+    isLoading = true;
+    if (refreshBtn) {
+      refreshBtn.classList.add('loading');
+    }
+    
+    showStatus('Actualizando perfiles...', 'loading');
+    
+    // Actualizar metadatos de todos los perfiles
+    await refreshAllProfilesMetadata();
+    
+    // Actualizar vista
+    await renderProfiles();
+    await loadLabelOptions();
+    
+    showStatus('¡Perfiles actualizados exitosamente!', 'success');
+    
+  } catch (error) {
+    showStatus(`Error al actualizar: ${error.message}`, 'error');
+  } finally {
+    isLoading = false;
+    if (refreshBtn) {
+      refreshBtn.classList.remove('loading');
+    }
+  }
+}
+
+// ============================================
+// MODAL HELPER FUNCTIONS
+// ============================================
+
+/**
+ * Muestra error en modal
+ */
+function showModalError(elementId, message, hide = false) {
+  const errorDiv = document.getElementById(elementId);
+  if (errorDiv) {
+    if (hide) {
+      errorDiv.classList.add('hidden');
+      errorDiv.textContent = '';
+    } else {
+      errorDiv.textContent = message;
+      errorDiv.classList.remove('hidden');
+    }
   }
 }
