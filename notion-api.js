@@ -72,7 +72,7 @@ async function checkDatabaseProperties(apiKey, databaseId) {
     const properties = database.properties || {};
     
     const required = {
-      nombre: { type: 'title', exists: false, actualName: null },
+      name: { type: 'title', exists: false, actualName: null },
       url: { type: 'url', exists: false },
       label: { type: 'select', exists: false },
       saved_from: { type: 'rich_text', exists: false },
@@ -85,19 +85,11 @@ async function checkDatabaseProperties(apiKey, databaseId) {
       const prop = properties[propName];
       if (prop.type === 'title') {
         titlePropertyName = propName;
-        // Si se llama "nombre", marcarla como existente
-        if (propName === 'nombre') {
-          required.nombre.exists = true;
-          required.nombre.actualName = propName;
-        }
+        // Marcar como existente y guardar el nombre actual
+        required.name.exists = true;
+        required.name.actualName = propName;
         break; // Solo puede haber una propiedad title
       }
-    }
-
-    // Si existe una propiedad title pero no se llama "nombre", la renombraremos
-    if (titlePropertyName && titlePropertyName !== 'nombre') {
-      required.nombre.exists = true; // Consideramos que existe (solo necesita renombrarse)
-      required.nombre.actualName = titlePropertyName;
     }
 
     // Verificar otras propiedades
@@ -114,10 +106,14 @@ async function checkDatabaseProperties(apiKey, databaseId) {
       }
     }
 
+    // Si la propiedad title no se llama "name", necesitamos renombrarla
+    const needsRename = titlePropertyName && titlePropertyName !== 'name';
+
     return {
-      hasAll: required.nombre.exists && required.url.exists && required.label.exists && required.saved_from.exists && required.thumbnail.exists,
+      hasAll: required.name.exists && required.url.exists && required.label.exists && required.saved_from.exists && required.thumbnail.exists,
       missing: Object.keys(required).filter(key => !required[key].exists),
-      titlePropertyName: required.nombre.actualName || titlePropertyName,
+      titlePropertyName: required.name.actualName || titlePropertyName,
+      needsRename: needsRename,
       database
     };
   } catch (error) {
@@ -126,24 +122,18 @@ async function checkDatabaseProperties(apiKey, databaseId) {
 }
 
 /**
- * Agrega propiedades faltantes a la base de datos y renombra la propiedad title si es necesario
+ * Agrega propiedades faltantes a la base de datos y renombra la propiedad title a "name"
  */
-async function addMissingProperties(apiKey, databaseId, missingProperties, titlePropertyName = null) {
+async function addMissingProperties(apiKey, databaseId, missingProperties, titlePropertyName = null, needsRename = false) {
   try {
     const properties = {};
-    const propertiesToAdd = missingProperties.filter(p => p !== 'nombre'); // Excluir 'nombre' de las propiedades a agregar
+    const propertiesToAdd = missingProperties.filter(p => p !== 'name'); // Excluir 'name' de las propiedades a agregar
     
-    // Si falta "nombre" pero existe una propiedad title, intentar renombrarla
-    if (missingProperties.includes('nombre') && titlePropertyName && titlePropertyName !== 'nombre') {
-      try {
-        // Intentar renombrar la propiedad title existente a "nombre"
-        properties[titlePropertyName] = {
-          name: 'nombre'
-        };
-      } catch (error) {
-        // Si falla el renombrado, simplemente usaremos el nombre actual de la propiedad
-        console.warn(`No se pudo renombrar la propiedad title a "nombre". Se usará el nombre actual: ${titlePropertyName}`);
-      }
+    // Si la propiedad title necesita ser renombrada a "name"
+    if (needsRename && titlePropertyName && titlePropertyName !== 'name') {
+      properties[titlePropertyName] = {
+        name: 'name'
+      };
     }
     
     // Agregar otras propiedades faltantes
@@ -325,7 +315,7 @@ async function getDatabaseMetadata(apiKey, databaseId) {
 /**
  * Crea una nueva página en la base de datos con la URL
  */
-async function createPage(apiKey, databaseId, url, title = null, label = null, titlePropertyName = 'nombre', savedFrom = null, thumbnailUploadId = null) {
+async function createPage(apiKey, databaseId, url, title = null, label = null, titlePropertyName = 'name', savedFrom = null, thumbnailUploadId = null) {
   try {
     const pageData = {
       parent: {

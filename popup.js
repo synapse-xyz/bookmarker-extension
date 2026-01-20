@@ -318,7 +318,7 @@ async function handleOnboardingSubmit(e) {
   
   try {
     // Validar configuración de Notion
-    await validateNotionConfig(apiKey, databaseId);
+    const validationResult = await validateNotionConfig(apiKey, databaseId);
     
     // Obtener metadatos de la base de datos
     const metadata = await getDatabaseMetadata(apiKey, databaseId);
@@ -331,7 +331,7 @@ async function handleOnboardingSubmit(e) {
       databaseId: databaseId,
       name: metadata.name,
       emoji: metadata.emoji,
-      titlePropertyName: 'nombre',
+      titlePropertyName: validationResult.titlePropertyName || 'name',
       labelOptions: []
     };
     
@@ -365,10 +365,10 @@ async function validateNotionConfig(apiKey, databaseId) {
     // Verificar propiedades
     const propertiesCheck = await checkDatabaseProperties(apiKey, databaseId);
     
-    // Si faltan propiedades, intentar agregarlas
-    if (!propertiesCheck.hasAll && propertiesCheck.missing.length > 0) {
+    // Si faltan propiedades o necesita renombrar, intentar agregarlas/renombrarlas
+    if (!propertiesCheck.hasAll && propertiesCheck.missing.length > 0 || propertiesCheck.needsRename) {
       try {
-        await addMissingProperties(apiKey, databaseId, propertiesCheck.missing, propertiesCheck.titlePropertyName);
+        await addMissingProperties(apiKey, databaseId, propertiesCheck.missing, propertiesCheck.titlePropertyName, propertiesCheck.needsRename);
       } catch (error) {
         // Si falla por permisos, lanzar error descriptivo
         if (error.message.includes('permisos') || error.message.includes('permission')) {
@@ -379,11 +379,10 @@ async function validateNotionConfig(apiKey, databaseId) {
     }
     
     // Guardar el nombre real de la propiedad title para usarlo al crear páginas
-    if (propertiesCheck.titlePropertyName) {
-      await chrome.storage.local.set({ notionTitlePropertyName: propertiesCheck.titlePropertyName });
-    }
+    // Después del renombrado, debería ser "name"
+    const finalTitlePropertyName = propertiesCheck.needsRename ? 'name' : propertiesCheck.titlePropertyName;
     
-    return true;
+    return { titlePropertyName: finalTitlePropertyName };
   } catch (error) {
     // Mejorar mensajes de error
     if (error.message.includes('404')) {
@@ -430,8 +429,14 @@ async function handleSaveURL() {
     try {
       const propertiesCheck = await checkDatabaseProperties(profile.apiKey, profile.databaseId);
       
-      if (!propertiesCheck.hasAll && propertiesCheck.missing.length > 0) {
-        await addMissingProperties(profile.apiKey, profile.databaseId, propertiesCheck.missing, propertiesCheck.titlePropertyName);
+      if (!propertiesCheck.hasAll && propertiesCheck.missing.length > 0 || propertiesCheck.needsRename) {
+        await addMissingProperties(profile.apiKey, profile.databaseId, propertiesCheck.missing, propertiesCheck.titlePropertyName, propertiesCheck.needsRename);
+        
+        // Si se renombró, actualizar el titlePropertyName del perfil
+        if (propertiesCheck.needsRename) {
+          profile.titlePropertyName = 'name';
+          await saveProfile(profile);
+        }
       }
     } catch (error) {
       console.error('Error verificando propiedades:', error);
@@ -740,7 +745,7 @@ async function handleAddProfileSubmit(e) {
     showModalError('modal-error', '', true); // Limpiar errores
     
     // Validar configuración de Notion
-    await validateNotionConfig(apiKey, databaseId);
+    const validationResult = await validateNotionConfig(apiKey, databaseId);
     
     // Obtener metadatos de la base de datos
     const metadata = await getDatabaseMetadata(apiKey, databaseId);
@@ -756,7 +761,7 @@ async function handleAddProfileSubmit(e) {
       databaseId: databaseId,
       name: metadata.name,
       emoji: metadata.emoji,
-      titlePropertyName: 'nombre',
+      titlePropertyName: validationResult.titlePropertyName || 'name',
       labelOptions: labelOptions
     };
     
@@ -846,7 +851,7 @@ async function handleSettingsSubmit(e) {
     showModalError('settings-error', '', true); // Limpiar errores
     
     // Validar nueva configuración
-    await validateNotionConfig(apiKey, databaseId);
+    const validationResult = await validateNotionConfig(apiKey, databaseId);
     
     // Obtener perfil actual
     const profile = await getSelectedProfile();
@@ -861,6 +866,7 @@ async function handleSettingsSubmit(e) {
     profile.databaseId = databaseId;
     profile.name = metadata.name;
     profile.emoji = metadata.emoji;
+    profile.titlePropertyName = validationResult.titlePropertyName || 'name';
     profile.labelOptions = labelOptions;
     
     // Guardar cambios

@@ -46,9 +46,11 @@ Extensión de Chrome que te permite guardar URLs directamente en tu base de dato
 4. Haz click en "Guardar Configuración"
 
 La extensión verificará automáticamente que tu base de datos tenga las propiedades necesarias:
-- `nombre` (title): Nombre de la página
+- `name` (title): Nombre de la página (la extensión renombrará la propiedad title existente a "name")
 - `url` (url): URL de la página
 - `label` (select): Etiqueta opcional
+- `saved_from` (rich_text): Dominio de origen
+- `thumbnail` (files): Captura de pantalla de la página
 
 Si faltan propiedades, la extensión intentará agregarlas automáticamente (requiere permisos de edición).
 
