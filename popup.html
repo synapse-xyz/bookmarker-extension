@@ -1,201 +1,184 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Notion URL Saver</title>
   <link rel="stylesheet" href="popup.css">
 </head>
+
 <body>
-  <!-- Vista de Onboarding (sin sidebar) -->
+
+  <!-- Vista de Onboarding -->
   <div id="onboarding-view" class="view hidden">
-    <div class="container">
-      <h1>Configuración Inicial</h1>
-      <p class="subtitle">Conecta tu extensión con Notion</p>
-      
-      <form id="onboarding-form">
-        <div class="form-group">
-          <label for="api-key">Notion API Key</label>
-          <input 
-            type="password" 
-            id="api-key" 
-            placeholder="secret_xxxxxxxxxxxxx" 
-            required
-          >
-          <small class="help-text">
-            Obtén tu API key en <a href="https://www.notion.so/my-integrations" target="_blank">Notion Integrations</a>
-          </small>
-        </div>
-        
-        <div class="form-group">
-          <label for="database-id">Database ID</label>
-          <input 
-            type="text" 
-            id="database-id" 
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
-            required
-          >
-          <small class="help-text">
-            El ID de tu base de datos de Notion (UUID)
-          </small>
-        </div>
-        
-        <div id="error-message" class="error-message hidden"></div>
-        
-        <button type="submit" id="save-config-btn" class="btn btn-primary">
-          Guardar Configuración
-        </button>
-      </form>
+    <div class="center-content">
+      <div class="container-small">
+        <form id="onboarding-form" class="card">
+          <div class="form-header">
+            <h1 class="title">Configuración Inicial</h1>
+            <p class="subtitle">Conecta tu extensión con Notion</p>
+          </div>
+
+          <div class="form-group">
+            <label class="label">Notion API Key</label>
+            <div class="control">
+              <input class="input" type="password" id="api-key" placeholder="secret_xxxxxxxxxxxxx" required>
+            </div>
+            <p class="help">Obtén tu API key en <a href="https://www.notion.so/my-integrations" target="_blank">Notion
+                Integrations</a></p>
+          </div>
+
+          <div class="form-group">
+            <label class="label">Database ID</label>
+            <div class="control">
+              <input class="input" type="text" id="database-id"
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+            </div>
+            <p class="help">El ID de tu base de datos (UUID)</p>
+          </div>
+
+          <div id="error-message" class="notification error hidden"></div>
+
+          <div class="form-actions">
+            <button type="submit" id="save-config-btn" class="button primary full-width">
+              Guardar Configuración
+            </button>
+          </div>
+        </form>
+
+      </div>
     </div>
   </div>
 
-  <!-- Vista Principal (con sidebar) -->
+  <!-- Vista Principal -->
   <div id="main-view" class="view hidden">
-    <!-- Botón de refresh en la esquina superior derecha -->
-    <div class="refresh-button-container">
-      <button id="refresh-btn" class="refresh-btn" title="Actualizar metadatos de las bases de datos">
-        ↻
-      </button>
-    </div>
 
     <div class="main-layout">
+
       <!-- Sidebar -->
-      <aside class="sidebar">
-        <div class="sidebar-header">Perfiles</div>
-        
-        <div class="profile-list" id="profile-list">
-          <!-- Se genera dinámicamente -->
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <p class="menu-label">Perfiles</p>
         </div>
-        
+
+        <div class="profile-list-container">
+          <ul class="menu-list" id="profile-list">
+            <!-- Generado dinámicamente -->
+          </ul>
+        </div>
+
         <div class="sidebar-footer">
-          <button id="add-profile-btn" class="btn btn-small">
-            + Añadir nuevo perfil
+          <button id="add-profile-btn" class="button small full-width mb-2" title="Añadir perfil">
+            <span class="icon">➕</span> Añadir
           </button>
-          <button id="config-btn" class="btn btn-small btn-secondary">
-            ⚙️ Configuración
+          <button id="config-btn" class="button small full-width secondary" title="Configuración">
+            <span class="icon">⚙️</span> Ajustes
           </button>
         </div>
-      </aside>
+      </div>
 
       <!-- Main Content -->
-      <main class="main-content">
-        <div class="container">
-          <h1>Guardar URL</h1>
-          
-          <div id="status-message" class="status-message hidden"></div>
-          
-          <div class="url-preview">
-            <p class="url-text" id="current-url">Cargando...</p>
-          </div>
-          
-          <div class="form-group">
-            <label for="label-select">Categoría (opcional)</label>
-            <select id="label-select" class="select-input">
-              <option value="">Sin categoría</option>
-            </select>
-          </div>
-          
-          <button id="save-url-btn" class="btn btn-primary">
-            Guardar URL en Notion
+      <div class="content">
+        <!-- Refresh Button -->
+        <div class="refresh-button-container">
+          <button id="refresh-btn" class="button icon-only rounded shadow" title="Actualizar metadatos">
+            ↻
           </button>
         </div>
-      </main>
+
+        <h1 class="content-title">Guardar URL</h1>
+
+        <div id="status-message" class="notification hidden"></div>
+
+        <div class="url-preview-box">
+          <p class="url-text" id="current-url">Cargando URL...</p>
+        </div>
+
+        <div class="form-group">
+          <label class="label">Categoría (opcional)</label>
+          <div class="control">
+            <div class="select-wrapper">
+              <select id="label-select" class="select full-width">
+                <option value="">Sin categoría</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button id="save-url-btn" class="button primary full-width mt-4">
+          Guardar en Notion
+        </button>
+      </div>
     </div>
   </div>
 
   <!-- Modal: Añadir Nuevo Perfil -->
   <div id="add-profile-modal" class="modal hidden">
     <div class="modal-overlay" id="modal-overlay-add"></div>
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Añadir Nuevo Perfil</h2>
-        <button class="modal-close" id="close-add-modal">&times;</button>
-      </div>
-      <form id="add-profile-form">
-        <div class="form-group">
-          <label for="modal-api-key">Notion API Key</label>
-          <input 
-            type="password" 
-            id="modal-api-key" 
-            placeholder="secret_xxxxxxxxxxxxx"
-            required
-          >
-          <small class="help-text">
-            Obtén tu API key en <a href="https://www.notion.so/my-integrations" target="_blank">Notion Integrations</a>
-          </small>
-        </div>
-        
-        <div class="form-group">
-          <label for="modal-db-id">Database ID</label>
-          <input 
-            type="text" 
-            id="modal-db-id" 
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            required
-          >
-          <small class="help-text">
-            El ID de tu base de datos de Notion (UUID)
-          </small>
-        </div>
-        
-        <div id="modal-error" class="error-message hidden"></div>
-        
-        <div class="modal-buttons">
-          <button type="button" id="cancel-add-modal" class="btn btn-secondary">
-            Cancelar
-          </button>
-          <button type="submit" class="btn btn-primary">
-            Guardar Perfil
-          </button>
-        </div>
-      </form>
+    <div class="modal-card">
+      <header class="modal-header">
+        <p class="modal-title">Nuevo Perfil</p>
+        <button class="close-modal" id="close-add-modal" aria-label="close">&times;</button>
+      </header>
+      <section class="modal-body">
+        <form id="add-profile-form">
+          <div class="form-group">
+            <label class="label">API Key</label>
+            <div class="control">
+              <input class="input" type="password" id="modal-api-key" placeholder="secret_..." required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="label">Database ID</label>
+            <div class="control">
+              <input class="input" type="text" id="modal-db-id" placeholder="uuid" required>
+            </div>
+          </div>
+          <div id="modal-error" class="notification error hidden"></div>
+        </form>
+      </section>
+      <footer class="modal-footer">
+        <button class="button secondary" id="cancel-add-modal">Cancelar</button>
+        <button class="button primary" type="submit" form="add-profile-form">Guardar</button>
+      </footer>
     </div>
   </div>
 
   <!-- Modal: Configuración -->
   <div id="settings-modal" class="modal hidden">
     <div class="modal-overlay" id="modal-overlay-settings"></div>
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Configuración</h2>
-        <button class="modal-close" id="close-settings-modal">&times;</button>
-      </div>
-      <form id="settings-form">
-        <div class="form-group">
-          <label for="settings-api-key">Notion API Key</label>
-          <input 
-            type="password" 
-            id="settings-api-key" 
-            placeholder="secret_xxxxxxxxxxxxx"
-            required
-          >
-        </div>
-        
-        <div class="form-group">
-          <label for="settings-db-id">Database ID</label>
-          <input 
-            type="text" 
-            id="settings-db-id" 
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            required
-          >
-        </div>
-        
-        <div id="settings-error" class="error-message hidden"></div>
-        
-        <div class="modal-buttons">
-          <button type="button" id="cancel-settings-modal" class="btn btn-secondary">
-            Cancelar
-          </button>
-          <button type="submit" class="btn btn-primary">
-            Guardar Cambios
-          </button>
-        </div>
-      </form>
+    <div class="modal-card">
+      <header class="modal-header">
+        <p class="modal-title">Configuración</p>
+        <button class="close-modal" id="close-settings-modal" aria-label="close">&times;</button>
+      </header>
+      <section class="modal-body">
+        <form id="settings-form">
+          <div class="form-group">
+            <label class="label">API Key</label>
+            <div class="control">
+              <input class="input" type="password" id="settings-api-key" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="label">Database ID</label>
+            <div class="control">
+              <input class="input" type="text" id="settings-db-id" required>
+            </div>
+          </div>
+          <div id="settings-error" class="notification error hidden"></div>
+        </form>
+      </section>
+      <footer class="modal-footer">
+        <button class="button secondary" id="cancel-settings-modal">Cancelar</button>
+        <button class="button primary" type="submit" form="settings-form">Guardar Cambios</button>
+      </footer>
     </div>
   </div>
 
   <script src="notion-api.js"></script>
   <script src="popup.js"></script>
 </body>
+
 </html>

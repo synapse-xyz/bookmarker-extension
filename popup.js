@@ -205,11 +205,21 @@ async function checkOnboardingStatus() {
 /**
  * Muestra la vista de onboarding
  */
-function showOnboardingView() {
+async function showOnboardingView() {
   onboardingView.classList.remove('hidden');
-  mainView.classList.add('hidden');
+  // Mantener mainView visible detrás para el efecto blur
+  mainView.classList.remove('hidden');
   errorMessage.classList.add('hidden');
   errorMessage.textContent = '';
+
+  // Restaurar datos temporales si existen
+  try {
+    const temp = await chrome.storage.local.get(['temp_apiKey', 'temp_dbId']);
+    if (temp.temp_apiKey) apiKeyInput.value = temp.temp_apiKey;
+    if (temp.temp_dbId) databaseIdInput.value = temp.temp_dbId;
+  } catch (e) {
+    console.warn('Error restoring temp data', e);
+  }
 }
 
 /**
@@ -231,7 +241,15 @@ async function showMainView() {
  * Configura los event listeners
  */
 function setupEventListeners() {
-  // Onboarding
+  // Onboarding inputs persistence
+  const saveTempData = (key, value) => {
+    chrome.storage.local.set({ [key]: value });
+  };
+
+  apiKeyInput.addEventListener('input', (e) => saveTempData('temp_apiKey', e.target.value));
+  databaseIdInput.addEventListener('input', (e) => saveTempData('temp_dbId', e.target.value));
+
+  // Onboarding form
   onboardingForm.addEventListener('submit', handleOnboardingSubmit);
   
   // Main view
@@ -338,6 +356,9 @@ async function handleOnboardingSubmit(e) {
     // Guardar perfil
     await saveProfile(profile);
     await setSelectedProfile(profileId);
+
+    // Limpiar datos temporales de onboarding
+    await chrome.storage.local.remove(['temp_apiKey', 'temp_dbId']);
     
     // Mostrar vista principal
     await showMainView();
@@ -581,7 +602,13 @@ function hideError() {
  */
 function showStatus(message, type = 'success') {
   statusMessage.textContent = message;
-  statusMessage.className = `status-message ${type}`;
+  
+  // Mapear tipos a clases de CSS
+  let notificationClass = 'success';
+  if (type === 'error') notificationClass = 'error';
+  if (type === 'loading') notificationClass = 'loading';
+  
+  statusMessage.className = `notification ${notificationClass}`;
   statusMessage.classList.remove('hidden');
 }
 
@@ -591,7 +618,8 @@ function showStatus(message, type = 'success') {
 function hideStatus() {
   statusMessage.classList.add('hidden');
   statusMessage.textContent = '';
-  statusMessage.className = 'status-message';
+  // Resetear clases base, manteniendo notification y hidden
+  statusMessage.className = 'notification hidden';
 }
 
 /**
@@ -603,11 +631,22 @@ function setLoading(loading) {
   saveUrlBtn.disabled = loading;
   
   if (loading) {
+    saveConfigBtn.classList.add('loading');
+    saveUrlBtn.classList.add('loading');
+    
+    // Guardar texto original si no existe
+    if (!saveConfigBtn.dataset.originalText) saveConfigBtn.dataset.originalText = saveConfigBtn.textContent;
+    if (!saveUrlBtn.dataset.originalText) saveUrlBtn.dataset.originalText = saveUrlBtn.textContent;
+    
     saveConfigBtn.textContent = 'Validando...';
     saveUrlBtn.textContent = 'Guardando...';
   } else {
-    saveConfigBtn.textContent = 'Guardar Configuración';
-    saveUrlBtn.textContent = 'Guardar URL en Notion';
+    saveConfigBtn.classList.remove('loading');
+    saveUrlBtn.classList.remove('loading');
+    
+    // Restaurar texto original
+    if (saveConfigBtn.dataset.originalText) saveConfigBtn.textContent = saveConfigBtn.dataset.originalText;
+    if (saveUrlBtn.dataset.originalText) saveUrlBtn.textContent = saveUrlBtn.dataset.originalText;
   }
 }
 
@@ -628,37 +667,41 @@ async function renderProfiles() {
   profileList.innerHTML = '';
   
   for (const profile of profiles) {
-    const profileItem = document.createElement('div');
-    profileItem.className = 'profile-item';
+    const a = document.createElement('a');
+    
     if (profile.id === selectedProfileId) {
-      profileItem.classList.add('selected');
+      a.classList.add('active');
     }
     
     const emoji = profile.emoji || '🔲';
     const name = profile.name || 'Sin nombre';
     
-    profileItem.innerHTML = `
-      <div class="profile-item-name">
-        <span class="profile-emoji">${emoji}</span>
-        <span>${name}</span>
-      </div>
-      <button type="button" class="profile-delete-btn" data-profile-id="${profile.id}">&times;</button>
+    // Estructura interna
+    a.innerHTML = `
+      <span style="display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap;">
+        <span>${emoji}</span>
+        <span style="text-overflow: ellipsis; overflow: hidden;" title="${name}">${name}</span>
+      </span>
+      <button type="button" class="delete-profile-btn" data-profile-id="${profile.id}">&times;</button>
     `;
     
-    // Click para seleccionar perfil
-    const nameArea = profileItem.querySelector('.profile-item-name');
-    nameArea.addEventListener('click', async () => {
+    // Click para seleccionar perfil (delegado al anchor, excluyendo el botón delete)
+    a.addEventListener('click', async (e) => {
+      // Si el click fue en el botón de borrar, no seleccionar
+      if (e.target.closest('.delete-profile-btn')) return;
       await selectProfile(profile.id);
     });
     
     // Click para eliminar perfil
-    const deleteBtn = profileItem.querySelector('.profile-delete-btn');
+    const deleteBtn = a.querySelector('.delete-profile-btn');
     deleteBtn.addEventListener('click', async (e) => {
-      e.stopPropagation();
+      e.stopPropagation(); // Prevenir selección
       await handleDeleteProfile(profile.id);
     });
     
-    profileList.appendChild(profileItem);
+    const li = document.createElement('li');
+    li.appendChild(a);
+    profileList.appendChild(li);
   }
 }
 
@@ -685,8 +728,18 @@ async function handleDeleteProfile(profileId) {
   if (!confirmed) return;
   
   await deleteProfile(profileId);
-  await renderProfiles();
-  await loadLabelOptions();
+  
+  // Verificar si quedan perfiles después de eliminar
+  const remainingProfiles = await getProfiles();
+  
+  if (remainingProfiles.length === 0) {
+    // No quedan perfiles, mostrar onboarding
+    showOnboardingView();
+  } else {
+    // Aún hay perfiles, actualizar vista
+    await renderProfiles();
+    await loadLabelOptions();
+  }
 }
 
 // ============================================
@@ -699,7 +752,7 @@ async function handleDeleteProfile(profileId) {
 function openAddProfileModal() {
   const modal = document.getElementById('add-profile-modal');
   if (modal) {
-    modal.classList.remove('hidden');
+    modal.classList.add('active');
   }
 }
 
@@ -712,7 +765,7 @@ function closeAddProfileModal() {
   const errorDiv = document.getElementById('modal-error');
   
   if (modal) {
-    modal.classList.add('hidden');
+    modal.classList.remove('active');
   }
   if (form) {
     form.reset();
@@ -806,7 +859,7 @@ async function openSettingsModal() {
   }
   
   if (modal) {
-    modal.classList.remove('hidden');
+    modal.classList.add('active');
   }
 }
 
@@ -819,7 +872,7 @@ function closeSettingsModal() {
   const errorDiv = document.getElementById('settings-error');
   
   if (modal) {
-    modal.classList.add('hidden');
+    modal.classList.remove('active');
   }
   if (form) {
     form.reset();
