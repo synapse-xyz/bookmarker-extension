@@ -14,7 +14,7 @@
     "https://api.notion.com/*"
   ],
   "background": {
-    "service_worker": "background.js",
+    "scripts": ["background.js"],
     "type": "module"
   },
   "browser_specific_settings": {
