@@ -1,6 +1,6 @@
-# Notion URL Saver - Extensión de Chrome
+# Notion URL Saver - Extensión para Navegadores
 
-Extensión de Chrome que te permite guardar URLs directamente en tu base de datos de Notion con un solo click. Ahora con soporte para múltiples perfiles y menú contextual.
+Guarda URLs directamente en tu base de datos de Notion con un solo click. Compatible con Chrome, Firefox y otros navegadores basados en Chromium.
 
 ## Características
 
@@ -14,11 +14,19 @@ Extensión de Chrome que te permite guardar URLs directamente en tu base de dato
 
 ## Instalación
 
-1. Clona o descarga este repositorio.
-2. Abre Chrome y ve a `chrome://extensions/`.
-3. Activa el "Modo de desarrollador" (Developer mode) en la esquina superior derecha.
-4. Haz click en "Cargar extensión sin empaquetar" (Load unpacked).
-5. Selecciona la carpeta del proyecto `bookmarker-extension`.
+Primero, descarga o clona este repositorio en tu equipo.
+
+### Google Chrome / Microsoft Edge / Brave
+1. Abre el navegador y ve a `chrome://extensions/`.
+2. Activa el **"Modo de desarrollador"** (Developer mode) en la esquina superior derecha.
+3. Haz click en el botón **"Cargar extensión sin empaquetar"** (Load unpacked).
+4. Selecciona la carpeta del proyecto `bookmarker-extension`.
+
+### Mozilla Firefox
+1. Abre Firefox y escribe `about:debugging` en la barra de direcciones.
+2. Haz click en **"Este Firefox"** (This Firefox) en el menú de la izquierda.
+3. Haz click en el botón **"Cargar complemento temporalmente..."** (Load Temporary Add-on...).
+4. Selecciona el archivo `manifest.json` que se encuentra en la raíz de la carpeta del proyecto.
 
 ## Configuración
 
@@ -37,11 +45,11 @@ Al abrir la extensión por primera vez, verás una pantalla de bienvenida:
 2. Ingresa el **Database ID**.
 3. Haz click en "Guardar Configuración".
 
-La extensión validará la conexión y guardará el perfil. Puedes agregar más perfiles posteriormente desde la interfaz principal.
+La extensión validará la conexión y guardará el perfil automáticamente. Puedes agregar más perfiles posteriormente desde la interfaz principal.
 
 ### Propiedades de la Base de Datos
 
-La extensión utiliza las siguientes propiedades (se crearán si no existen y tienes permisos):
+La extensión utiliza las siguientes propiedades (se crearán automáticamente si no existen):
 - `name` (title): Título de la página.
 - `url` (url): Link guardado.
 - `label` (select): Categoría/Etiqueta.
@@ -52,51 +60,35 @@ La extensión utiliza las siguientes propiedades (se crearán si no existen y ti
 
 ### Desde el Popup
 1. Haz click en el icono de la extensión.
-2. Selecciona un perfil (si tienes varios).
-3. (Opcional) Elige una etiqueta.
-4. Haz click en "Guardar URL en Notion".
+2. Selecciona un perfil y (opcionalmente) una etiqueta.
+3. Haz click en **"Guardar URL en Notion"**.
 
 ### Desde el Menú Contextual (Click Derecho)
-- **En cualquier página:** Selecciona "Guardar página actual en Notion" para guardar la URL y una captura de pantalla.
-- **Sobre un enlace:** Selecciona "Guardar enlace en Notion" para guardar solo ese link específico (sin captura).
+- **Sobre la página:** "Guardar página actual en Notion" (incluye captura de pantalla).
+- **Sobre un enlace:** "Guardar enlace en Notion" (rápido, sin captura).
 
-Observa el icono de la extensión para ver el estado:
-- 🔵 `...`: Guardando...
-- 🟢 `✓`: ¡Guardado exitoso!
-- 🔴 `✗`: Error (revisa tu configuración).
+### Feedback Visual
+Observa el icono de la extensión para conocer el estado:
+- 🔵 `...`: Procesando...
+- 🟢 `✓`: ¡Guardado con éxito!
+- 🔴 `✗`: Error (abre el popup para más detalles).
 
 ## Estructura del Proyecto
 
 ```
 bookmarker-extension/
-├── manifest.json           # Configuración (Manifest V3)
-├── background.js           # Service worker y menú contextual
-├── popup.html              # Interfaz de usuario
-├── popup.css               # Estilos
-├── popup.js                # Lógica de la interfaz
-├── shared-functions.js     # Lógica compartida (API Notion, Storage)
-├── notion-api.js           # (Deprecado - funciones movidas a shared)
-├── IMPLEMENTATION_NOTES.md # Detalles técnicos
-└── TROUBLESHOOTING.md      # Solución de problemas
+├── manifest.json           # Configuración de la extensión
+├── background.js           # Lógica de fondo y menús contextuales
+├── shared-functions.js     # Funciones compartidas (API, Storage)
+├── popup.html/js/css       # Interfaz de usuario
+├── IMPLEMENTATION_NOTES.md # Notas técnicas
+└── TROUBLESHOOTING.md      # Guía de solución de problemas
 ```
-
-## Solución de Problemas
-
-Si encuentras errores:
-1. **API Key/Database ID:** Verifica que sean correctos y que la integración esté conectada a la base de datos.
-2. **Badges Rojos:** Si el icono muestra una `✗`, abre el popup para ver el mensaje de error detallado.
-3. **Logs:**
-   - Click derecho en el popup > "Inspeccionar" para ver errores de interfaz.
-   - Ve a `chrome://extensions` > "Inspect views: service worker" para errores de fondo.
-
-Consulta `TROUBLESHOOTING.md` para más detalles.
 
 ## Desarrollo
 
-Construido con:
-- Vanilla JavaScript (ES Modules)
-- Chrome Extension Manifest V3
-- Notion API
+- **Tecnologías:** Vanilla JavaScript (ES Modules), Manifest V3.
+- **API:** Notion API v1.
 
 ## Licencia
 
