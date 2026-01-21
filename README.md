@@ -76,10 +76,6 @@ bookmarker-extension/
 ├── popup.js                # Lógica de la interfaz
 ├── shared-functions.js     # Lógica compartida (API Notion, Storage)
 ├── notion-api.js           # (Deprecado - funciones movidas a shared)
-├── icons/                  # Iconos de la extensión
-│   ├── icon16.png
-│   ├── icon48.png
-│   └── icon128.png
 ├── IMPLEMENTATION_NOTES.md # Detalles técnicos
 └── TROUBLESHOOTING.md      # Solución de problemas
 ```
