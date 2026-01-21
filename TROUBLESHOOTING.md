@@ -200,3 +200,30 @@ chrome.runtime.getManifest()
 chrome.storage.local.get(null, (items) => console.log(items))
 ```
 
+
+---
+
+## Firefox: Error "background.service_worker is currently disabled"
+
+**Error completo:**
+```
+Hubo un error durante la instalación del complemento temporal.
+background.service_worker is currently disabled. Add background.scripts.
+```
+
+**Solución:**
+Este error ocurre porque Firefox no soporta `service_worker` en manifest v3 (todavía).
+
+✅ **Ya está solucionado en la versión actual:**
+El manifest.json ahora usa `background.scripts` en lugar de `service_worker`.
+
+**Si aún ves el error:**
+1. Asegúrate de tener el manifest.json actualizado
+2. Recarga la extensión (about:debugging)
+3. Si el problema persiste, ve a "Paso 1: Verificar que la extensión cargó"
+
+**Diferencias entre service_worker y scripts:**
+- `service_worker`: Mejor para Chrome, no soportado por Firefox
+- `scripts`: Compatible con Firefox 109+ y Chrome 121+
+- Ambos usan `type: "module"` para ES6 modules
+

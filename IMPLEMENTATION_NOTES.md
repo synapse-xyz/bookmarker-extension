@@ -225,3 +225,32 @@ Si encuentras algún problema:
 **Autor:** Christopher Glood
 **Rama:** chris-dev
 **Fecha:** Wed Jan 21 2026
+
+## 🔧 Compatibilidad Firefox
+
+La implementación inicial usaba `service_worker` en manifest.json, que no es soportado por Firefox.
+
+**Error:** "background.service_worker is currently disabled. Add background.scripts"
+
+**Solución:** Cambiar de `service_worker` a `scripts` con `type: "module"`:
+
+```json
+// ❌ NO FUNCIONA EN FIREFOX
+"background": {
+  "service_worker": "background.js",
+  "type": "module"
+}
+
+// ✅ FUNCIONA EN CHROME Y FIREFOX
+"background": {
+  "scripts": ["background.js"],
+  "type": "module"
+}
+```
+
+**Nota importante:** Cuando usas `scripts` en lugar de `service_worker`, el comportamiento es ligeramente diferente:
+- El service worker sigue siendo un worker, pero se define como script
+- Firefox lo mantiene vivo mientras sea necesario
+- Chrome 121+ también soporta esta configuración
+- Los listeners (`onInstalled`, `onClicked`, etc.) funcionan igual
+
