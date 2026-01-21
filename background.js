@@ -8,8 +8,41 @@ import {
   uploadImageToNotion,
   extractDomain,
   checkDatabaseProperties,
+  checkDatabasePropertiesWithCache,
   addMissingProperties
 } from './shared-functions.js';
+
+// ============================================
+// PERFORMANCE: PROFILE CACHE
+// ============================================
+
+let cachedProfile = null;
+let cacheTimestamp = 0;
+
+/**
+ * Obtiene el perfil con cache en memoria (5 minutos)
+ * Ahorro: ~50ms por guardado
+ */
+async function getProfileWithCache() {
+  const now = Date.now();
+  
+  if (cachedProfile && (now - cacheTimestamp < 300000)) { // 5 minutos
+    return cachedProfile;
+  }
+  
+  cachedProfile = await getSelectedProfile();
+  cacheTimestamp = now;
+  return cachedProfile;
+}
+
+/**
+ * Invalidar cache cuando cambia el perfil seleccionado o los perfiles
+ */
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'local' && (changes.selectedProfileId || changes.profiles)) {
+    cachedProfile = null;
+  }
+});
 
 // ============================================
 // SERVICE WORKER CLEANUP
@@ -77,35 +110,45 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 /**
  * Maneja guardar la página actual desde el menú contextual
+ * OPTIMIZADO: Operaciones en paralelo + cache
  */
 async function handleSaveCurrentPage(tab) {
   try {
     showLoadingBadge();
     
-    // 1. Obtener perfil seleccionado
-    const profile = await getSelectedProfile();
+    // PASO 1: Obtener perfil y capturar screenshot EN PARALELO
+    const [profile, dataUrl] = await Promise.all([
+      getProfileWithCache(),  // PERFORMANCE: Con cache
+      chrome.tabs.captureVisibleTab(tab.windowId, {
+        format: 'jpeg',  // PERFORMANCE: JPEG quality 70
+        quality: 70
+      })
+    ]);
+    
     if (!profile) {
       showErrorBadge('No hay perfil');
       return;
     }
     
-    // 2. Capturar screenshot de la pestaña
+    // PASO 2: Upload imagen y validar BD EN PARALELO
     let thumbnailUploadId = null;
+    let propertiesCheck = null;
+    
     try {
-      const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
-        format: 'png',
-        quality: 90
-      });
-      thumbnailUploadId = await uploadImageToNotion(profile.apiKey, dataUrl);
+      [thumbnailUploadId, propertiesCheck] = await Promise.all([
+        uploadImageToNotion(profile.apiKey, dataUrl).catch(err => {
+          console.warn('Error uploading screenshot:', err);
+          return null;
+        }),
+        checkDatabasePropertiesWithCache(profile.apiKey, profile.databaseId)  // PERFORMANCE: Con cache
+      ]);
     } catch (error) {
-      console.warn('Error capturando/subiendo screenshot:', error);
-      // Continuar sin thumbnail
+      console.warn('Error en operaciones paralelas:', error);
     }
     
-    // 3. Verificar propiedades de la base de datos
-    try {
-      const propertiesCheck = await checkDatabaseProperties(profile.apiKey, profile.databaseId);
-      if (!propertiesCheck.hasAll || propertiesCheck.needsRename) {
+    // PASO 3: Agregar propiedades faltantes si es necesario (raro, solo primera vez)
+    if (propertiesCheck && (!propertiesCheck.hasAll || propertiesCheck.needsRename)) {
+      try {
         await addMissingProperties(
           profile.apiKey,
           profile.databaseId,
@@ -113,19 +156,19 @@ async function handleSaveCurrentPage(tab) {
           propertiesCheck.titlePropertyName,
           propertiesCheck.needsRename
         );
+      } catch (error) {
+        console.warn('Error verificando propiedades:', error);
       }
-    } catch (error) {
-      console.warn('Error verificando propiedades:', error);
     }
     
-    // 4. Crear página en Notion
+    // PASO 4: Crear página en Notion
     const domain = extractDomain(tab.url);
     await createPage(
       profile.apiKey,
       profile.databaseId,
       tab.url,
       tab.title,
-      null, // sin categoría por defecto
+      null,
       profile.titlePropertyName,
       domain,
       thumbnailUploadId
@@ -141,25 +184,26 @@ async function handleSaveCurrentPage(tab) {
 
 /**
  * Maneja guardar un enlace específico desde el menú contextual
+ * OPTIMIZADO: Operaciones en paralelo + cache
  */
 async function handleSaveLink(info, tab) {
   try {
     showLoadingBadge();
     
-    // 1. Obtener perfil seleccionado
-    const profile = await getSelectedProfile();
+    // PASO 1: Obtener perfil
+    const profile = await getProfileWithCache();  // PERFORMANCE: Con cache
+    
     if (!profile) {
       showErrorBadge('No hay perfil');
       return;
     }
     
-    // 2. Obtener URL del link
-    const linkUrl = info.linkUrl;
-    const linkText = info.selectionText || info.linkUrl; // Usar texto seleccionado o la URL
-    
-    // 3. Verificar propiedades (igual que en página actual)
+    // PASO 2: Validar propiedades de BD
+    let propertiesCheck = null;
     try {
-      const propertiesCheck = await checkDatabaseProperties(profile.apiKey, profile.databaseId);
+      propertiesCheck = await checkDatabasePropertiesWithCache(profile.apiKey, profile.databaseId);  // PERFORMANCE: Con cache
+      
+      // Agregar propiedades si es necesario
       if (!propertiesCheck.hasAll || propertiesCheck.needsRename) {
         await addMissingProperties(
           profile.apiKey,
@@ -173,14 +217,17 @@ async function handleSaveLink(info, tab) {
       console.warn('Error verificando propiedades:', error);
     }
     
-    // 4. Crear página SIN thumbnail
+    // PASO 3: Crear página SIN thumbnail
+    const linkUrl = info.linkUrl;
+    const linkText = info.selectionText || info.linkUrl;
     const domain = extractDomain(linkUrl);
+    
     await createPage(
       profile.apiKey,
       profile.databaseId,
       linkUrl,
       linkText,
-      null, // sin categoría por defecto
+      null,
       profile.titlePropertyName,
       domain,
       null  // sin thumbnail

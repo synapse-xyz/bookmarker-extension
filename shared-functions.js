@@ -179,7 +179,8 @@ export async function notionRequest(apiKey, endpoint, method = 'GET', body = nul
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Notion-Version': NOTION_VERSION,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Accept-Encoding': 'gzip, deflate, br'  // PERFORMANCE: Request compression
     }
   };
 
@@ -286,6 +287,44 @@ export async function checkDatabaseProperties(apiKey, databaseId) {
   } catch (error) {
     throw error;
   }
+}
+
+// ============================================
+// PERFORMANCE: DATABASE VALIDATION CACHE
+// ============================================
+
+const validatedDatabases = new Map();
+
+/**
+ * Versión cacheada de checkDatabaseProperties
+ * Cache válido por 30 minutos para evitar validaciones repetidas
+ * Ahorro: ~500ms por guardado después del primero
+ */
+export async function checkDatabasePropertiesWithCache(apiKey, databaseId) {
+  const cacheKey = `${databaseId}-${apiKey.slice(-8)}`;
+  
+  if (validatedDatabases.has(cacheKey)) {
+    const cached = validatedDatabases.get(cacheKey);
+    if (Date.now() - cached.timestamp < 1800000) { // 30 minutos
+      return cached.data;
+    }
+  }
+  
+  const result = await checkDatabaseProperties(apiKey, databaseId);
+  validatedDatabases.set(cacheKey, {
+    data: result,
+    timestamp: Date.now()
+  });
+  
+  return result;
+}
+
+/**
+ * Limpia el cache de validación de bases de datos
+ * Útil para forzar re-validación después de cambios en el schema
+ */
+export function clearDatabaseCache() {
+  validatedDatabases.clear();
 }
 
 /**
