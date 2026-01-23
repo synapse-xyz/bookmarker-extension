@@ -276,13 +276,13 @@ body {
   background-color: var(--primary-hover);
 }
 
-.button.secondary {
+.button.secondary.,  .refresh-button-container > button{
   background-color: var(--sidebar-bg);
   border-color: var(--almond-silk);
   color: var(--taupe-gray);
 }
 
-.button.secondary:hover {
+.button.secondary:hover, .refresh-button-container > button{
   background-color: var(--bone);
   color: var(--carbon-black);
 }
@@ -409,7 +409,6 @@ body {
   right: 15px;
   z-index: 10;
 }
-
 .shadow {
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
