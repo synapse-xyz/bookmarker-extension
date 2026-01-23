@@ -115,6 +115,12 @@ async function showMainView() {
  * Configura los event listeners
  */
 function setupEventListeners() {
+  // Sidebar toggle
+  const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+  if (sidebarToggleBtn) {
+    sidebarToggleBtn.addEventListener('click', toggleSidebarActions);
+  }
+
   // Onboarding inputs persistence
   const saveTempData = (key, value) => {
     chrome.storage.local.set({ [key]: value });
@@ -185,6 +191,26 @@ function setupEventListeners() {
   const settingsModalOverlay = document.getElementById('modal-overlay-settings');
   if (settingsModalOverlay) {
     settingsModalOverlay.addEventListener('click', closeSettingsModal);
+  }
+}
+
+/**
+ * Alterna la visibilidad de las acciones del sidebar
+ */
+function toggleSidebarActions() {
+  const sidebarActions = document.getElementById('sidebar-actions');
+  if (sidebarActions) {
+    const isCollapsed = sidebarActions.classList.contains('collapsed');
+    
+    if (isCollapsed) {
+      // Expandir
+      sidebarActions.classList.remove('collapsed');
+      sidebarActions.style.display = 'flex';
+    } else {
+      // Colapsar
+      sidebarActions.classList.add('collapsed');
+      sidebarActions.style.display = 'none';
+    }
   }
 }
 
