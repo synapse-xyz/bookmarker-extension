@@ -126,6 +126,9 @@ body {
 
 .sidebar-footer {
   padding: var(--space-md);
+  gap: var(--space-md);
+  display: flex;
+  flex-direction: column;
   border-top: 1px solid var(--border-color);
   background-color: var(--sidebar-bg);
 }
@@ -198,11 +201,16 @@ body {
   align-items: center;
   padding: 8px 16px;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  font-size: 0.9rem;
+  border-radius: var(--radius-lg);
+  font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.2s;
   font-weight: 500;
+}
+
+.button > svg {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 
@@ -246,7 +254,7 @@ body {
   background-color: var(--primary);
   border-color: transparent;
 }
-#save-config-btn-loader {
+#save-config-btn-loader, #save-url-btn-loader {
   width: 16px;
   height: 16px;
   animation: spin 1s linear infinite;

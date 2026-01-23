@@ -460,7 +460,7 @@ function hideStatus() {
 /**
  * Establece el estado de carga
  */
-function setLoading(loading) {
+function setLoading(loading, callToActionId = '') {
   isLoading = loading;
   // Deshabilitar botones durante la carga
   saveConfigBtn.disabled = loading;
