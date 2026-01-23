@@ -12,7 +12,7 @@
   /* Color Palette */
   --silver: #cebebe;
   --bone: #F2EFE9;
-  --almond-silk: #d5b9b2;
+  --almond-silk: #e7ccc5;
   --smoky-rose: #a26769;
   --carbon-black: #252627;
   --wine-plum: #904E55;
@@ -22,8 +22,8 @@
   --primary-hover: #582438;
   --primary-text: var(--bone);
   
-  --secondary: var(--almond-silk);
-  --secondary-hover: #c4a69e;
+  --secondary: #e6ddd6; /* versión más oscura del bone para mejor contraste */
+  --secondary-hover: #d4c9be;
   
   --bg-color: var(--bone);
   --bg-color-dark: var(--carbon-black);
