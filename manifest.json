@@ -18,6 +18,13 @@
     "scripts": ["background.js"],
     "type": "module"
   },
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "browser_specific_settings": {
     "gecko": {
       "id": "bookmarker-extension@synapse.com",

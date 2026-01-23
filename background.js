@@ -106,6 +106,33 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 // ============================================
+// CONTENT SCRIPT MESSAGING
+// ============================================
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type !== 'save-link-from-content') {
+    return;
+  }
+
+  const { url, title } = message.payload || {};
+
+  (async () => {
+    try {
+      showLoadingBadge();
+      await saveUrlToNotion({ url, title });
+      showSuccessBadge();
+      sendResponse({ success: true });
+    } catch (error) {
+      console.error('Error guardando enlace desde contenido:', error);
+      showErrorBadge(error.message || 'Error');
+      sendResponse({ success: false, message: error.message || 'Error al guardar' });
+    }
+  })();
+
+  return true;
+});
+
+// ============================================
 // CONTEXT MENU HANDLERS
 // ============================================
 
@@ -190,56 +217,55 @@ async function handleSaveCurrentPage(tab) {
 async function handleSaveLink(info, tab) {
   try {
     showLoadingBadge();
-    
-    // PASO 1: Obtener perfil
-    const profile = await getProfileWithCache();  // PERFORMANCE: Con cache
-    
-    if (!profile) {
-      showErrorBadge('No hay perfil');
-      return;
-    }
-    
-    // PASO 2: Validar propiedades de BD
-    let propertiesCheck = null;
-    try {
-      propertiesCheck = await checkDatabasePropertiesWithCache(profile.apiKey, profile.databaseId);  // PERFORMANCE: Con cache
-      
-      // Agregar propiedades si es necesario
-      if (!propertiesCheck.hasAll || propertiesCheck.needsRename) {
-        await addMissingProperties(
-          profile.apiKey,
-          profile.databaseId,
-          propertiesCheck.missing,
-          propertiesCheck.titlePropertyName,
-          propertiesCheck.needsRename
-        );
-      }
-    } catch (error) {
-      console.warn('Error verificando propiedades:', error);
-    }
-    
-    // PASO 3: Crear página SIN thumbnail
-    const linkUrl = info.linkUrl;
-    const linkText = info.selectionText || info.linkUrl;
-    const domain = extractDomain(linkUrl);
-    
-    await createPage(
-      profile.apiKey,
-      profile.databaseId,
-      linkUrl,
-      linkText,
-      null,
-      profile.titlePropertyName,
-      domain,
-      null  // sin thumbnail
-    );
-    
+    await saveUrlToNotion({
+      url: info.linkUrl,
+      title: info.selectionText || info.linkUrl
+    });
     showSuccessBadge();
-    
   } catch (error) {
     console.error('Error guardando enlace:', error);
     showErrorBadge(error.message || 'Error');
   }
+}
+
+async function saveUrlToNotion({ url, title }) {
+  const profile = await getProfileWithCache();  // PERFORMANCE: Con cache
+
+  if (!profile) {
+    throw new Error('No hay perfil');
+  }
+
+  let propertiesCheck = null;
+  try {
+    propertiesCheck = await checkDatabasePropertiesWithCache(profile.apiKey, profile.databaseId);  // PERFORMANCE: Con cache
+
+    if (!propertiesCheck.hasAll || propertiesCheck.needsRename) {
+      await addMissingProperties(
+        profile.apiKey,
+        profile.databaseId,
+        propertiesCheck.missing,
+        propertiesCheck.titlePropertyName,
+        propertiesCheck.needsRename
+      );
+    }
+  } catch (error) {
+    console.warn('Error verificando propiedades:', error);
+  }
+
+  const linkUrl = url;
+  const linkText = title || url;
+  const domain = extractDomain(linkUrl);
+
+  await createPage(
+    profile.apiKey,
+    profile.databaseId,
+    linkUrl,
+    linkText,
+    null,
+    profile.titlePropertyName,
+    domain,
+    null  // sin thumbnail
+  );
 }
 
 // ============================================
