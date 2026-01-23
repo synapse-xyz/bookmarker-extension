@@ -1,4 +1,4 @@
-# Notion URL Saver - Extensión para Navegadores
+# Bookmarker Extension - Extensión para Navegadores
 
 Guarda URLs directamente en tu base de datos de Notion con un solo click. Compatible con Chrome, Firefox y otros navegadores basados en Chromium.
 
@@ -77,12 +77,13 @@ Observa el icono de la extensión para conocer el estado:
 
 ```
 bookmarker-extension/
-├── manifest.json           # Configuración de la extensión
-├── background.js           # Lógica de fondo y menús contextuales
-├── shared-functions.js     # Funciones compartidas (API, Storage)
-├── popup.html/js/css       # Interfaz de usuario
-├── IMPLEMENTATION_NOTES.md # Notas técnicas
-└── TROUBLESHOOTING.md      # Guía de solución de problemas
+├── manifest.json           # Configuración de la extensión (permisos, iconos, etc.)
+├── background.js           # Lógica de fondo (menús contextuales, badges)
+├── shared-functions.js     # Funciones compartidas (API de Notion, gestión de perfiles)
+├── popup.html              # Estructura de la interfaz del popup
+├── popup.js                # Lógica de la interfaz del popup (guardado, perfiles)
+├── popup.css               # Estilos para la interfaz del popup
+└── icons/                  # Iconos de la extensión en diferentes tamaños
 ```
 
 ## Desarrollo
