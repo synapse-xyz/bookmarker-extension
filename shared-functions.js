@@ -22,29 +22,30 @@ export async function migrateOldFormat() {
     
     // Si existen datos del formato antiguo
     if (result.notionApiKey && result.notionDatabaseId) {
-      // Obtener metadatos de la base de datos
-      let name = 'Base de datos';
-      let emoji = null;
-      
-      try {
-        const metadata = await getDatabaseMetadata(result.notionApiKey, result.notionDatabaseId);
-        name = metadata.name;
-        emoji = metadata.emoji;
-      } catch (error) {
-        console.warn('Error fetching metadata during migration:', error);
-      }
-      
-      // Crear perfil desde datos antiguos
-      const profileId = Date.now().toString();
-      const profile = {
-        id: profileId,
-        apiKey: result.notionApiKey,
-        databaseId: result.notionDatabaseId,
-        name: name,
-        emoji: emoji,
-        titlePropertyName: result.notionTitlePropertyName || 'nombre',
-        labelOptions: []
-      };
+    // Crear perfil desde datos antiguos
+    const profileId = Date.now().toString();
+
+    // Obtener metadatos de la base de datos
+    let name = 'Base de datos';
+    let emoji = null;
+    
+    try {
+      const metadata = await getDatabaseMetadata(result.notionApiKey, result.notionDatabaseId, profileId, { forceRefresh: true });
+      name = metadata.name;
+      emoji = metadata.emoji;
+    } catch (error) {
+      console.warn('Error fetching metadata during migration:', error);
+    }
+    
+    const profile = {
+      id: profileId,
+      apiKey: result.notionApiKey,
+      databaseId: result.notionDatabaseId,
+      name: name,
+      emoji: emoji,
+      titlePropertyName: result.notionTitlePropertyName || 'nombre',
+      labelOptions: []
+    };
       
       // Guardar en nuevo formato
       await chrome.storage.local.set({
@@ -141,26 +142,94 @@ export async function getSelectedProfileLabelOptions() {
   return profile?.labelOptions || [];
 }
 
+// ============================================
+// PROFILE DATABASE CACHE (REFRESH)
+// ============================================
+
+const profileDatabaseCache = [];
+
+function getProfileDatabaseCache(profileId) {
+  return profileDatabaseCache.find(entry => entry.profileId === profileId) || null;
+}
+
+function upsertProfileDatabaseCache(profileDatabase) {
+  const index = profileDatabaseCache.findIndex(entry => entry.profileId === profileDatabase.profileId);
+  if (index >= 0) {
+    profileDatabaseCache[index] = profileDatabase;
+  } else {
+    profileDatabaseCache.push(profileDatabase);
+  }
+}
+
+export function clearProfileDatabaseCache() {
+  profileDatabaseCache.length = 0;
+}
+
+function mapDatabaseToProfileData(profileId, database) {
+  const title = database.title?.[0]?.plain_text || 'Sin nombre';
+  let emoji = null;
+
+  if (database.icon) {
+    if (database.icon.type === 'emoji') {
+      emoji = database.icon.emoji;
+    } else {
+      emoji = '🔲';
+    }
+  }
+
+  const properties = database.properties || {};
+  let labelOptions = [];
+
+  if (properties.label && properties.label.type === 'select') {
+    const options = properties.label.select.options || [];
+    labelOptions = options.map(option => option.name);
+  }
+
+  return {
+    profileId,
+    title,
+    emoji,
+    labelOptions
+  };
+}
+
+async function getProfileDatabaseData(profileId, apiKey, databaseId, { forceRefresh = false } = {}) {
+  if (!forceRefresh && profileId) {
+    const cached = getProfileDatabaseCache(profileId);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  const database = await getDatabase(apiKey, databaseId);
+  const mapped = mapDatabaseToProfileData(profileId, database);
+
+  if (profileId) {
+    upsertProfileDatabaseCache(mapped);
+  }
+
+  return mapped;
+}
+
 /**
  * Actualiza metadatos para todos los perfiles (refresh)
  */
 export async function refreshAllProfilesMetadata() {
   const profiles = await getProfiles();
-  
+
+  clearProfileDatabaseCache();
+
   for (let profile of profiles) {
     try {
-      const metadata = await getDatabaseMetadata(profile.apiKey, profile.databaseId);
-      profile.name = metadata.name;
-      profile.emoji = metadata.emoji;
-      
-      // Obtener opciones de categorías
-      const options = await getLabelOptions(profile.apiKey, profile.databaseId);
-      profile.labelOptions = options;
+      const profileData = await getProfileDatabaseData(profile.id, profile.apiKey, profile.databaseId, { forceRefresh: true });
+      profile.name = profileData.title;
+      profile.emoji = profileData.emoji;
+      profile.labelOptions = profileData.labelOptions;
     } catch (error) {
       console.warn(`Error refreshing profile ${profile.id}:`, error);
     }
   }
-  
+
   await chrome.storage.local.set({ profiles, lastFetched: Date.now() });
   return profiles;
 }
@@ -401,17 +470,10 @@ export async function addMissingProperties(apiKey, databaseId, missingProperties
 /**
  * Obtiene las opciones disponibles del select "label"
  */
-export async function getLabelOptions(apiKey, databaseId) {
+export async function getLabelOptions(apiKey, databaseId, profileId = null, options = {}) {
   try {
-    const database = await getDatabase(apiKey, databaseId);
-    const properties = database.properties || {};
-    
-    if (properties.label && properties.label.type === 'select') {
-      const options = properties.label.select.options || [];
-      return options.map(option => option.name);
-    }
-    
-    return [];
+    const profileData = await getProfileDatabaseData(profileId, apiKey, databaseId, options);
+    return profileData.labelOptions || [];
   } catch (error) {
     throw new Error(`Error al obtener opciones de label: ${error.message}`);
   }
@@ -496,23 +558,10 @@ export async function uploadImageToNotion(apiKey, dataURL) {
 /**
  * Obtiene metadatos de la base de datos (nombre y emoji)
  */
-export async function getDatabaseMetadata(apiKey, databaseId) {
+export async function getDatabaseMetadata(apiKey, databaseId, profileId = null, options = {}) {
   try {
-    const database = await getDatabase(apiKey, databaseId);
-    const name = database.title?.[0]?.plain_text || 'Sin nombre';
-    
-    // Obtener emoji si existe
-    let emoji = null;
-    if (database.icon) {
-      if (database.icon.type === 'emoji') {
-        emoji = database.icon.emoji;
-      } else {
-        // Si es un icono personalizado (archivo), mostrar "🔲"
-        emoji = '🔲';
-      }
-    }
-    
-    return { name, emoji };
+    const profileData = await getProfileDatabaseData(profileId, apiKey, databaseId, options);
+    return { name: profileData.title, emoji: profileData.emoji };
   } catch (error) {
     throw new Error(`Error al obtener metadatos de la base de datos: ${error.message}`);
   }

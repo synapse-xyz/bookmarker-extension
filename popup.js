@@ -204,12 +204,13 @@ async function handleOnboardingSubmit(e) {
   try {
     // Validar configuración de Notion
     const validationResult = await validateNotionConfig(apiKey, databaseId);
-    
-    // Obtener metadatos de la base de datos
-    const metadata = await getDatabaseMetadata(apiKey, databaseId);
-    
+
     // Crear nuevo perfil
     const profileId = Date.now().toString();
+
+    // Obtener metadatos de la base de datos
+    const metadata = await getDatabaseMetadata(apiKey, databaseId, profileId, { forceRefresh: true });
+    
     const profile = {
       id: profileId,
       apiKey: apiKey,
@@ -393,7 +394,7 @@ async function loadLabelOptions() {
     labelSelect.innerHTML = '<option value="">Sin categoría</option>';
     
     // Obtener opciones de label desde Notion
-    const options = await getLabelOptions(profile.apiKey, profile.databaseId);
+    const options = await getLabelOptions(profile.apiKey, profile.databaseId, profile.id);
     
     // Agregar opciones al select
     options.forEach(option => {
@@ -626,15 +627,16 @@ async function handleAddProfileSubmit(e) {
     
     // Validar configuración de Notion
     const validationResult = await validateNotionConfig(apiKey, databaseId);
-    
-    // Obtener metadatos de la base de datos
-    const metadata = await getDatabaseMetadata(apiKey, databaseId);
-    
-    // Obtener opciones de categorías
-    const labelOptions = await getLabelOptions(apiKey, databaseId);
-    
+
     // Crear nuevo perfil
     const profileId = Date.now().toString();
+
+    // Obtener metadatos de la base de datos
+    const metadata = await getDatabaseMetadata(apiKey, databaseId, profileId, { forceRefresh: true });
+    
+    // Obtener opciones de categorías
+    const labelOptions = await getLabelOptions(apiKey, databaseId, profileId);
+    
     const profile = {
       id: profileId,
       apiKey: apiKey,
@@ -738,8 +740,8 @@ async function handleSettingsSubmit(e) {
     if (!profile) return;
     
     // Obtener nuevos metadatos
-    const metadata = await getDatabaseMetadata(apiKey, databaseId);
-    const labelOptions = await getLabelOptions(apiKey, databaseId);
+    const metadata = await getDatabaseMetadata(apiKey, databaseId, profile.id, { forceRefresh: true });
+    const labelOptions = await getLabelOptions(apiKey, databaseId, profile.id);
     
     // Actualizar perfil
     profile.apiKey = apiKey;
