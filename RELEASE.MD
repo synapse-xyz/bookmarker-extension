@@ -1,6 +1,6 @@
-### Notion URL Saver v1.0.0 - ¡Lanzamiento Inicial! 🎉
+### Bookmarker Extension v1.0.0 - ¡Lanzamiento Inicial! 🎉
 
-¡Estamos emocionados de anunciar el primer lanzamiento de **Notion URL Saver**, la extensión definitiva para guardar y organizar contenido web directamente en tus bases de datos de Notion!
+¡Estamos emocionados de anunciar el primer lanzamiento de **Bookmarker Extension**, la extensión definitiva para guardar y organizar contenido web directamente en tus bases de datos de Notion!
 
 Con un solo click, puedes capturar artículos, enlaces y más, sin interrumpir tu flujo de trabajo. Esta versión inicial está repleta de funcionalidades diseñadas para ser potentes y fáciles de usar.
 
@@ -28,4 +28,4 @@ Puedes encontrar las instrucciones detalladas para instalar y configurar la exte
 
 Este es solo el comienzo. Estamos trabajando en nuevas funcionalidades y mejoras. Si encuentras algún error o tienes ideas para futuras versiones, no dudes en abrir un **issue** aquí mismo, en el repositorio del proyecto `bookmarker-extension`.
 
-¡Gracias por probar Notion URL Saver! Esperamos que te ayude a ser más productivo y a mantener tu espacio de Notion perfectamente organizado.
+¡Gracias por probar Bookmarker Extension! Esperamos que te ayude a ser más productivo y a mantener tu espacio de Notion perfectamente organizado.
