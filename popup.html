@@ -32,8 +32,8 @@
           <div class="form-group">
             <label class="label">Database ID</label>
             <div class="control">
-              <input class="input" type="text" id="database-id"
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+              <input class="input" type="text" id="database-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                required>
             </div>
             <p class="help">El ID de tu base de datos (UUID)</p>
           </div>
@@ -42,7 +42,20 @@
 
           <div class="form-actions">
             <button type="submit" id="save-config-btn" class="button primary full-width">
-              Guardar Configuración
+              <span id="save-config-btn-text">Guardar Configuración</span>
+              <svg xmlns="http://www.w3.org/2000/svg" id="save-config-btn-loader" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="icon icon-tabler icons-tabler-outline icon-tabler-loader loader hidden">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M12 6l0 -3" />
+                <path d="M16.25 7.75l2.15 -2.15" />
+                <path d="M18 12l3 0" />
+                <path d="M16.25 16.25l2.15 2.15" />
+                <path d="M12 18l0 3" />
+                <path d="M7.75 16.25l-2.15 2.15" />
+                <path d="M6 12l-3 0" />
+                <path d="M7.75 7.75l-2.15 -2.15" />
+              </svg>
             </button>
           </div>
         </form>
@@ -107,7 +120,20 @@
         </div>
 
         <button id="save-url-btn" class="button primary full-width mt-4">
-          Guardar en Notion
+          <span id="save-url-btn-text">Guardar en Notion</span>
+          <svg xmlns="http://www.w3.org/2000/svg" id="save-url-btn-loader" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="icon icon-tabler icons-tabler-outline icon-tabler-loader loader hidden">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M12 6l0 -3" />
+                <path d="M16.25 7.75l2.15 -2.15" />
+                <path d="M18 12l3 0" />
+                <path d="M16.25 16.25l2.15 2.15" />
+                <path d="M12 18l0 3" />
+                <path d="M7.75 16.25l-2.15 2.15" />
+                <path d="M6 12l-3 0" />
+                <path d="M7.75 7.75l-2.15 -2.15" />
+              </svg>
         </button>
       </div>
     </div>
