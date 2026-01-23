@@ -277,14 +277,14 @@ body {
 }
 
 .button.secondary {
-  background-color: var(--white);
-  border-color: var(--border-color);
-  color: var(--text-color);
+  background-color: var(--sidebar-bg);
+  border-color: var(--almond-silk);
+  color: var(--taupe-gray);
 }
 
 .button.secondary:hover {
-  background-color: #f5f5f5;
-  border-color: #bbb;
+  background-color: var(--bone);
+  color: var(--carbon-black);
 }
 
 .button.small {
