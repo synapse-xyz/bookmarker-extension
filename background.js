@@ -82,7 +82,8 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: 'save-current-page',
     title: 'Guardar página actual en Notion',
-    contexts: ['page', 'selection', 'image', 'frame']
+    contexts: ['page', 'selection', 'image', 'frame'],
+    documentUrlPatterns: ['https://*/*'],
   });
 
   // Crear menú para guardar un enlace específico
