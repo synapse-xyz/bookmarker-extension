@@ -110,16 +110,40 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // ============================================
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === 'capture-visible-tab') {
+    const windowId = sender.tab?.windowId;
+
+    if (windowId === undefined) {
+      sendResponse({ success: false, message: 'No se pudo capturar' });
+      return;
+    }
+
+    chrome.tabs.captureVisibleTab(
+      windowId,
+      { format: 'jpeg', quality: 80 },
+      (dataUrl) => {
+        if (chrome.runtime.lastError || !dataUrl) {
+          sendResponse({ success: false, message: 'Error al capturar' });
+          return;
+        }
+
+        sendResponse({ success: true, dataUrl });
+      }
+    );
+
+    return true;
+  }
+
   if (message?.type !== 'save-link-from-content') {
     return;
   }
 
-  const { url, title } = message.payload || {};
+  const { url, title, thumbnailDataUrl } = message.payload || {};
 
   (async () => {
     try {
       showLoadingBadge();
-      await saveUrlToNotion({ url, title });
+      await saveUrlToNotion({ url, title, thumbnailDataUrl });
       showSuccessBadge();
       sendResponse({ success: true });
     } catch (error) {
@@ -228,18 +252,29 @@ async function handleSaveLink(info, tab) {
   }
 }
 
-async function saveUrlToNotion({ url, title }) {
+async function saveUrlToNotion({ url, title, thumbnailDataUrl }) {
   const profile = await getProfileWithCache();  // PERFORMANCE: Con cache
 
   if (!profile) {
     throw new Error('No hay perfil');
   }
 
+  let thumbnailUploadId = null;
   let propertiesCheck = null;
-  try {
-    propertiesCheck = await checkDatabasePropertiesWithCache(profile.apiKey, profile.databaseId);  // PERFORMANCE: Con cache
 
-    if (!propertiesCheck.hasAll || propertiesCheck.needsRename) {
+  try {
+    const uploadPromise = thumbnailDataUrl
+      ? uploadImageToNotion(profile.apiKey, thumbnailDataUrl).catch(error => {
+          console.warn('Error uploading screenshot:', error);
+          return null;
+        })
+      : Promise.resolve(null);
+
+    const propertiesPromise = checkDatabasePropertiesWithCache(profile.apiKey, profile.databaseId);  // PERFORMANCE: Con cache
+
+    [thumbnailUploadId, propertiesCheck] = await Promise.all([uploadPromise, propertiesPromise]);
+
+    if (propertiesCheck && (!propertiesCheck.hasAll || propertiesCheck.needsRename)) {
       await addMissingProperties(
         profile.apiKey,
         profile.databaseId,
@@ -264,7 +299,7 @@ async function saveUrlToNotion({ url, title }) {
     null,
     profile.titlePropertyName,
     domain,
-    null  // sin thumbnail
+    thumbnailUploadId
   );
 }
 
