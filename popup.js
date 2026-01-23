@@ -1,158 +1,25 @@
 // ============================================
-// STORAGE HELPERS & MIGRATION
+// IMPORTS FROM SHARED FUNCTIONS
 // ============================================
 
-/**
- * Migra datos del formato antiguo al nuevo formato de perfiles
- */
-async function migrateOldFormat() {
-  try {
-    const result = await chrome.storage.local.get(['notionApiKey', 'notionDatabaseId']);
-    
-    // Si existen datos del formato antiguo
-    if (result.notionApiKey && result.notionDatabaseId) {
-      // Obtener metadatos de la base de datos
-      let name = 'Base de datos';
-      let emoji = null;
-      
-      try {
-        const metadata = await getDatabaseMetadata(result.notionApiKey, result.notionDatabaseId);
-        name = metadata.name;
-        emoji = metadata.emoji;
-      } catch (error) {
-        console.warn('Error fetching metadata during migration:', error);
-      }
-      
-      // Crear perfil desde datos antiguos
-      const profileId = Date.now().toString();
-      const profile = {
-        id: profileId,
-        apiKey: result.notionApiKey,
-        databaseId: result.notionDatabaseId,
-        name: name,
-        emoji: emoji,
-        titlePropertyName: result.notionTitlePropertyName || 'nombre',
-        labelOptions: []
-      };
-      
-      // Guardar en nuevo formato
-      await chrome.storage.local.set({
-        profiles: [profile],
-        selectedProfileId: profileId
-      });
-      
-      // Limpiar datos antiguos
-      await chrome.storage.local.remove(['notionApiKey', 'notionDatabaseId', 'notionTitlePropertyName']);
-      
-      console.log('Migration completed successfully');
-      return true;
-    }
-  } catch (error) {
-    console.error('Error during migration:', error);
-  }
-  return false;
-}
-
-/**
- * Obtiene todos los perfiles
- */
-async function getProfiles() {
-  const result = await chrome.storage.local.get(['profiles']);
-  return result.profiles || [];
-}
-
-/**
- * Obtiene el perfil seleccionado actualmente
- */
-async function getSelectedProfile() {
-  const result = await chrome.storage.local.get(['profiles', 'selectedProfileId']);
-  const profiles = result.profiles || [];
-  const selectedId = result.selectedProfileId;
-  
-  if (selectedId && profiles.length > 0) {
-    return profiles.find(p => p.id === selectedId) || null;
-  }
-  return null;
-}
-
-/**
- * Guarda un perfil (nuevo o actualizado)
- */
-async function saveProfile(profile) {
-  const profiles = await getProfiles();
-  const index = profiles.findIndex(p => p.id === profile.id);
-  
-  if (index >= 0) {
-    profiles[index] = profile;
-  } else {
-    profiles.push(profile);
-  }
-  
-  await chrome.storage.local.set({ profiles });
-  return profile;
-}
-
-/**
- * Elimina un perfil
- */
-async function deleteProfile(profileId) {
-  const profiles = await getProfiles();
-  const result = await chrome.storage.local.get(['selectedProfileId']);
-  
-  const filteredProfiles = profiles.filter(p => p.id !== profileId);
-  
-  // Si el perfil eliminado era el seleccionado, seleccionar otro
-  let newSelectedId = result.selectedProfileId;
-  if (newSelectedId === profileId && filteredProfiles.length > 0) {
-    newSelectedId = filteredProfiles[0].id;
-  } else if (filteredProfiles.length === 0) {
-    newSelectedId = null;
-  }
-  
-  await chrome.storage.local.set({ 
-    profiles: filteredProfiles,
-    selectedProfileId: newSelectedId
-  });
-}
-
-/**
- * Establece el perfil seleccionado
- */
-async function setSelectedProfile(profileId) {
-  await chrome.storage.local.set({ selectedProfileId: profileId });
-}
-
-/**
- * Obtiene opciones de label para el perfil seleccionado
- */
-async function getSelectedProfileLabelOptions() {
-  const profile = await getSelectedProfile();
-  return profile?.labelOptions || [];
-}
-
-/**
- * Actualiza metadatos para todos los perfiles (refresh)
- */
-async function refreshAllProfilesMetadata() {
-  const profiles = await getProfiles();
-  
-  for (let profile of profiles) {
-    try {
-      const metadata = await getDatabaseMetadata(profile.apiKey, profile.databaseId);
-      profile.name = metadata.name;
-      profile.emoji = metadata.emoji;
-      
-      // Obtener opciones de categorías
-      const options = await getLabelOptions(profile.apiKey, profile.databaseId);
-      profile.labelOptions = options;
-    } catch (error) {
-      console.warn(`Error refreshing profile ${profile.id}:`, error);
-    }
-  }
-  
-  await chrome.storage.local.set({ profiles, lastFetched: Date.now() });
-  return profiles;
-}
+import { 
+  migrateOldFormat,
+  getProfiles,
+  getSelectedProfile,
+  saveProfile,
+  deleteProfile,
+  setSelectedProfile,
+  getSelectedProfileLabelOptions,
+  refreshAllProfilesMetadata,
+  getDatabaseMetadata,
+  checkDatabaseProperties,
+  addMissingProperties,
+  getLabelOptions,
+  extractDomain,
+  uploadImageToNotion,
+  createPage,
+  validateNotionConfig
+} from './shared-functions.js';
 
 // ============================================
 // DOM ELEMENTS
@@ -375,47 +242,7 @@ async function handleOnboardingSubmit(e) {
   }
 }
 
-/**
- * Valida la configuración de Notion
- */
-async function validateNotionConfig(apiKey, databaseId) {
-  try {
-    // Verificar que la base de datos existe y es accesible
-    const database = await getDatabase(apiKey, databaseId);
-    
-    // Verificar propiedades
-    const propertiesCheck = await checkDatabaseProperties(apiKey, databaseId);
-    
-    // Si faltan propiedades o necesita renombrar, intentar agregarlas/renombrarlas
-    if (!propertiesCheck.hasAll && propertiesCheck.missing.length > 0 || propertiesCheck.needsRename) {
-      try {
-        await addMissingProperties(apiKey, databaseId, propertiesCheck.missing, propertiesCheck.titlePropertyName, propertiesCheck.needsRename);
-      } catch (error) {
-        // Si falla por permisos, lanzar error descriptivo
-        if (error.message.includes('permisos') || error.message.includes('permission')) {
-          throw new Error('No tienes permisos para modificar esta base de datos. Asegúrate de que tu integración tenga acceso y permisos de edición en la base de datos.');
-        }
-        throw error;
-      }
-    }
-    
-    // Guardar el nombre real de la propiedad title para usarlo al crear páginas
-    // Después del renombrado, debería ser "name"
-    const finalTitlePropertyName = propertiesCheck.needsRename ? 'name' : propertiesCheck.titlePropertyName;
-    
-    return { titlePropertyName: finalTitlePropertyName };
-  } catch (error) {
-    // Mejorar mensajes de error
-    if (error.message.includes('404')) {
-      throw new Error('Base de datos no encontrada. Verifica que el Database ID sea correcto y que tu integración tenga acceso a la base de datos.');
-    } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-      throw new Error('API Key inválida. Verifica que tu API Key sea correcta.');
-    } else if (error.message.includes('403')) {
-      throw new Error('No tienes permisos para acceder a esta base de datos. Asegúrate de que tu integración esté conectada a la base de datos en Notion.');
-    }
-    throw error;
-  }
-}
+
 
 /**
  * Maneja el guardado de la URL actual

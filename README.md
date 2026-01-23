@@ -1,123 +1,95 @@
-# Notion URL Saver - Extensión de Chrome
+# Notion URL Saver - Extensión para Navegadores
 
-Extensión de Chrome que te permite guardar URLs directamente en tu base de datos de Notion con un solo click.
+Guarda URLs directamente en tu base de datos de Notion con un solo click. Compatible con Chrome, Firefox y otros navegadores basados en Chromium.
 
 ## Características
 
-- 🚀 Guarda URLs de páginas web en Notion
-- ⚙️ Configuración simple con onboarding
-- 🔍 Validación automática de propiedades de base de datos
-- ✨ Interfaz moderna y fácil de usar
-- 🔒 Almacenamiento seguro de credenciales
+- 🚀 **Guardado Rápido:** Guarda URLs de páginas web en Notion con un click.
+- 👥 **Múltiples Perfiles:** Configura y alterna entre diferentes bases de datos o espacios de trabajo.
+- 🖱️ **Menú Contextual:** Guarda la página actual o enlaces específicos haciendo click derecho, sin abrir el popup.
+- 📸 **Capturas de Pantalla:** Guarda automáticamente una miniatura de la página (solo al guardar página completa).
+- 🏷️ **Etiquetado:** Asigna etiquetas (select) a tus guardados directamente desde la extensión.
+- 🔍 **Validación Automática:** Verifica y crea las propiedades necesarias en tu base de datos.
+- 🚦 **Feedback Visual:** Indicadores de estado (badges) en el icono para confirmar el guardado.
 
 ## Instalación
 
-1. Clona o descarga este repositorio
-2. Abre Chrome y ve a `chrome://extensions/`
-3. Activa el "Modo de desarrollador" (Developer mode) en la esquina superior derecha
-4. Haz click en "Cargar extensión sin empaquetar" (Load unpacked)
-5. Selecciona la carpeta del proyecto
+Primero, descarga o clona este repositorio en tu equipo.
+
+### Google Chrome / Microsoft Edge / Brave
+1. Abre el navegador y ve a `chrome://extensions/`.
+2. Activa el **"Modo de desarrollador"** (Developer mode) en la esquina superior derecha.
+3. Haz click en el botón **"Cargar extensión sin empaquetar"** (Load unpacked).
+4. Selecciona la carpeta del proyecto `bookmarker-extension`.
+
+### Mozilla Firefox
+1. Abre Firefox y escribe `about:debugging` en la barra de direcciones.
+2. Haz click en **"Este Firefox"** (This Firefox) en el menú de la izquierda.
+3. Haz click en el botón **"Cargar complemento temporalmente..."** (Load Temporary Add-on...).
+4. Selecciona el archivo `manifest.json` que se encuentra en la raíz de la carpeta del proyecto.
 
 ## Configuración
 
-### 1. Crear una Integración en Notion
+### 1. Preparar Notion
 
-1. Ve a [Notion Integrations](https://www.notion.so/my-integrations)
-2. Haz click en "New integration"
-3. Dale un nombre a tu integración (ej: "URL Saver")
-4. Selecciona el workspace donde está tu base de datos
-5. Copia el **Internal Integration Token** (API Key)
+1. Crea una Integración en [Notion Integrations](https://www.notion.so/my-integrations).
+2. Obtén el **Internal Integration Token** (API Key).
+3. Conecta tu integración a la base de datos deseada (menú `...` > Add connections).
+4. Obtén el **Database ID** desde la URL de la base de datos.
 
-### 2. Conectar la Base de Datos
+### 2. Configurar la Extensión
 
-1. Abre tu base de datos en Notion
-2. Haz click en los tres puntos (⋯) en la esquina superior derecha
-3. Selecciona "Add connections" o "Conectar"
-4. Busca y selecciona tu integración
-5. Copia el **Database ID** de la URL de tu base de datos:
-   - La URL se ve así: `https://www.notion.so/workspace/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
-   - El Database ID es la parte después del último `/` (sin guiones)
+Al abrir la extensión por primera vez, verás una pantalla de bienvenida:
 
-### 3. Configurar la Extensión
+1. Ingresa tu **API Key** de Notion.
+2. Ingresa el **Database ID**.
+3. Haz click en "Guardar Configuración".
 
-1. Haz click en el icono de la extensión en Chrome
-2. Ingresa tu **API Key** de Notion
-3. Ingresa el **Database ID** de tu base de datos
-4. Haz click en "Guardar Configuración"
+La extensión validará la conexión y guardará el perfil automáticamente. Puedes agregar más perfiles posteriormente desde la interfaz principal.
 
-La extensión verificará automáticamente que tu base de datos tenga las propiedades necesarias:
-- `name` (title): Nombre de la página (la extensión renombrará la propiedad title existente a "name")
-- `url` (url): URL de la página
-- `label` (select): Etiqueta opcional
-- `saved_from` (rich_text): Dominio de origen
-- `thumbnail` (files): Captura de pantalla de la página
+### Propiedades de la Base de Datos
 
-Si faltan propiedades, la extensión intentará agregarlas automáticamente (requiere permisos de edición).
+La extensión utiliza las siguientes propiedades (se crearán automáticamente si no existen):
+- `name` (title): Título de la página.
+- `url` (url): Link guardado.
+- `label` (select): Categoría/Etiqueta.
+- `saved_from` (rich_text): Dominio de origen.
+- `thumbnail` (files): Captura de pantalla (opcional).
 
 ## Uso
 
-1. Navega a cualquier página web que quieras guardar
-2. Haz click en el icono de la extensión
-3. Haz click en "Guardar URL en Notion"
-4. ¡Listo! La URL se guardará en tu base de datos de Notion
+### Desde el Popup
+1. Haz click en el icono de la extensión.
+2. Selecciona un perfil y (opcionalmente) una etiqueta.
+3. Haz click en **"Guardar URL en Notion"**.
 
-## Iconos
+### Desde el Menú Contextual (Click Derecho)
+- **Sobre la página:** "Guardar página actual en Notion" (incluye captura de pantalla).
+- **Sobre un enlace:** "Guardar enlace en Notion" (rápido, sin captura).
 
-La extensión requiere iconos en las siguientes dimensiones:
-- `icons/icon16.png` (16x16 píxeles)
-- `icons/icon48.png` (48x48 píxeles)
-- `icons/icon128.png` (128x128 píxeles)
-
-Puedes generar iconos básicos ejecutando:
-```bash
-python3 generate-icons.py
-```
-
-O crear tus propios iconos y colocarlos en la carpeta `icons/`.
+### Feedback Visual
+Observa el icono de la extensión para conocer el estado:
+- 🔵 `...`: Procesando...
+- 🟢 `✓`: ¡Guardado con éxito!
+- 🔴 `✗`: Error (abre el popup para más detalles).
 
 ## Estructura del Proyecto
 
 ```
-pomodoro-cursor/
-├── manifest.json          # Configuración de la extensión
-├── popup.html             # Interfaz del popup
-├── popup.css              # Estilos del popup
-├── popup.js               # Lógica principal
-├── notion-api.js          # Integración con Notion API
-├── icons/                 # Iconos de la extensión
-│   ├── icon16.png
-│   ├── icon48.png
-│   └── icon128.png
-└── README.md              # Este archivo
+bookmarker-extension/
+├── manifest.json           # Configuración de la extensión
+├── background.js           # Lógica de fondo y menús contextuales
+├── shared-functions.js     # Funciones compartidas (API, Storage)
+├── popup.html/js/css       # Interfaz de usuario
+├── IMPLEMENTATION_NOTES.md # Notas técnicas
+└── TROUBLESHOOTING.md      # Guía de solución de problemas
 ```
-
-## Solución de Problemas
-
-### Error: "API Key inválida"
-- Verifica que copiaste correctamente el Internal Integration Token
-- Asegúrate de que la integración no haya sido eliminada
-
-### Error: "Base de datos no encontrada"
-- Verifica que el Database ID sea correcto
-- Asegúrate de que la integración esté conectada a la base de datos en Notion
-
-### Error: "No tienes permisos para modificar esta base de datos"
-- Ve a tu base de datos en Notion
-- Conecta la integración si no está conectada
-- Asegúrate de que la integración tenga permisos de edición
-
-### La extensión no guarda URLs
-- Verifica que la configuración esté guardada correctamente
-- Revisa la consola del navegador para ver errores (F12)
-- Asegúrate de que la base de datos tenga las propiedades correctas
 
 ## Desarrollo
 
-Esta extensión está construida con:
-- Vanilla JavaScript (sin frameworks)
-- Chrome Extension Manifest V3
-- Notion API v1
+- **Tecnologías:** Vanilla JavaScript (ES Modules), Manifest V3.
+- **API:** Notion API v1.
 
 ## Licencia
 
-Este proyecto es de código abierto y está disponible para uso personal y comercial.
+Este proyecto es de código abierto.
