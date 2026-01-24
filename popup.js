@@ -2,7 +2,7 @@
 // IMPORTS FROM SHARED FUNCTIONS
 // ============================================
 
-import { 
+import {
   migrateOldFormat,
   getProfiles,
   getSelectedProfile,
@@ -32,6 +32,13 @@ const onboardingForm = document.getElementById('onboarding-form');
 const apiKeyInput = document.getElementById('api-key');
 const databaseIdInput = document.getElementById('database-id');
 const errorMessage = document.getElementById('error-message');
+// save config elements
+const saveConfigBtnLoader = document.getElementById('save-config-btn-loader');
+const saveConfigBtnText = document.getElementById('save-config-btn-text');
+// save url elements
+const saveUrlBtnLoader = document.getElementById('save-url-btn-loader');
+const saveUrlBtnText = document.getElementById('save-url-btn-text');
+// buttons
 const saveConfigBtn = document.getElementById('save-config-btn');
 const saveUrlBtn = document.getElementById('save-url-btn');
 const statusMessage = document.getElementById('status-message');
@@ -40,6 +47,19 @@ const labelSelect = document.getElementById('label-select');
 
 // Estado
 let isLoading = false;
+
+// Iconos del Sidebar
+const SIDEBAR_ICONS = {
+  COLLAPSED: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              class="icon icon-tabler icons-tabler-outline icon-tabler-layout-bottombar-expand">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M20 6v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2" />
+              <path d="M20 15h-16" />
+              <path d="M14 10l-2 -2l-2 2" />
+            </svg>`, // Mostrar cuando está colapsado (para abrir configuración)
+  EXPANDED: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-layout-bottombar-collapse"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 6v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2" /><path d="M20 15h-16" /><path d="M14 8l-2 2l-2 -2" /></svg>`   // Mostrar cuando está expandido (para cerrar)
+};
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', async () => {
@@ -56,7 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function checkOnboardingStatus() {
   try {
     const profiles = await getProfiles();
-    
+
     if (profiles && profiles.length > 0) {
       await showMainView();
       await loadCurrentTabURL();
@@ -96,10 +116,10 @@ async function showMainView() {
   onboardingView.classList.add('hidden');
   mainView.classList.remove('hidden');
   statusMessage.classList.add('hidden');
-  
+
   // Renderizar perfiles en sidebar
   await renderProfiles();
-  
+
   // Cargar opciones de label del perfil seleccionado
   await loadLabelOptions();
 }
@@ -108,6 +128,14 @@ async function showMainView() {
  * Configura los event listeners
  */
 function setupEventListeners() {
+  // Sidebar toggle
+  const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+  if (sidebarToggleBtn) {
+    sidebarToggleBtn.addEventListener('click', toggleSidebarActions);
+    // Inicializar icono (asumiendo estado inicial colapsado)
+    updateSidebarToggleIcon(true);
+  }
+
   // Onboarding inputs persistence
   const saveTempData = (key, value) => {
     chrome.storage.local.set({ [key]: value });
@@ -118,66 +146,98 @@ function setupEventListeners() {
 
   // Onboarding form
   onboardingForm.addEventListener('submit', handleOnboardingSubmit);
-  
+
   // Main view
   saveUrlBtn.addEventListener('click', handleSaveURL);
-  
+
   // Refresh button
   const refreshBtn = document.getElementById('refresh-btn');
   if (refreshBtn) {
     refreshBtn.addEventListener('click', handleRefresh);
   }
-  
+
   // Add Profile button & modal
   const addProfileBtn = document.getElementById('add-profile-btn');
   if (addProfileBtn) {
     addProfileBtn.addEventListener('click', openAddProfileModal);
   }
-  
+
   const addProfileForm = document.getElementById('add-profile-form');
   if (addProfileForm) {
     addProfileForm.addEventListener('submit', handleAddProfileSubmit);
   }
-  
+
   const closeAddModalBtn = document.getElementById('close-add-modal');
   if (closeAddModalBtn) {
     closeAddModalBtn.addEventListener('click', closeAddProfileModal);
   }
-  
+
   const cancelAddModalBtn = document.getElementById('cancel-add-modal');
   if (cancelAddModalBtn) {
     cancelAddModalBtn.addEventListener('click', closeAddProfileModal);
   }
-  
+
   const addModalOverlay = document.getElementById('modal-overlay-add');
   if (addModalOverlay) {
     addModalOverlay.addEventListener('click', closeAddProfileModal);
   }
-  
+
   // Config button & modal
   const configBtn = document.getElementById('config-btn');
   if (configBtn) {
     configBtn.addEventListener('click', openSettingsModal);
   }
-  
+
   const settingsForm = document.getElementById('settings-form');
   if (settingsForm) {
     settingsForm.addEventListener('submit', handleSettingsSubmit);
   }
-  
+
   const closeSettingsModalBtn = document.getElementById('close-settings-modal');
   if (closeSettingsModalBtn) {
     closeSettingsModalBtn.addEventListener('click', closeSettingsModal);
   }
-  
+
   const cancelSettingsModalBtn = document.getElementById('cancel-settings-modal');
   if (cancelSettingsModalBtn) {
     cancelSettingsModalBtn.addEventListener('click', closeSettingsModal);
   }
-  
+
   const settingsModalOverlay = document.getElementById('modal-overlay-settings');
   if (settingsModalOverlay) {
     settingsModalOverlay.addEventListener('click', closeSettingsModal);
+  }
+}
+
+function updateSidebarToggleIcon(isCollapsed) {
+  const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+  if (sidebarToggleBtn) {
+    sidebarToggleBtn.innerHTML = isCollapsed ? SIDEBAR_ICONS.COLLAPSED : SIDEBAR_ICONS.EXPANDED;
+  }
+}
+
+/**
+ * Alterna la visibilidad de las acciones del sidebar
+ */
+function toggleSidebarActions() {
+  const sidebarActions = document.getElementById('sidebar-actions');
+
+  if (sidebarActions) {
+    const isCollapsed = sidebarActions.classList.contains('collapsed');
+
+    if (isCollapsed) {
+      // Expandir
+      sidebarActions.classList.remove('collapsed');
+      sidebarActions.style.display = 'flex';
+      updateSidebarToggleIcon(false);
+    } else {
+      // Colapsar
+      sidebarActions.classList.add('collapsed');
+      sidebarActions.style.display = 'none';
+      updateSidebarToggleIcon(true);
+      sidebarActions.style.display = 'none';
+      if (sidebarToggleBtn) sidebarToggleBtn.innerHTML = '⚙️'; // Emoji para expandir/config
+    }
   }
 }
 
@@ -186,12 +246,12 @@ function setupEventListeners() {
  */
 async function handleOnboardingSubmit(e) {
   e.preventDefault();
-  
+
   if (isLoading) return;
-  
+
   const apiKey = apiKeyInput.value.trim();
   const databaseId = databaseIdInput.value.trim();
-  
+
   // Validación básica
   if (!apiKey || !databaseId) {
     showError('Por favor, completa todos los campos');
@@ -200,7 +260,7 @@ async function handleOnboardingSubmit(e) {
 
   setLoading(true);
   hideError();
-  
+
   try {
     // Validar configuración de Notion
     const validationResult = await validateNotionConfig(apiKey, databaseId);
@@ -210,7 +270,7 @@ async function handleOnboardingSubmit(e) {
 
     // Obtener metadatos de la base de datos
     const metadata = await getDatabaseMetadata(apiKey, databaseId, profileId, { forceRefresh: true });
-    
+
     const profile = {
       id: profileId,
       apiKey: apiKey,
@@ -220,22 +280,22 @@ async function handleOnboardingSubmit(e) {
       titlePropertyName: validationResult.titlePropertyName || 'name',
       labelOptions: []
     };
-    
+
     // Guardar perfil
     await saveProfile(profile);
     await setSelectedProfile(profileId);
 
     // Limpiar datos temporales de onboarding
     await chrome.storage.local.remove(['temp_apiKey', 'temp_dbId']);
-    
+
     // Mostrar vista principal
     await showMainView();
     await loadCurrentTabURL();
-    
+
     // Limpiar formulario
     apiKeyInput.value = '';
     databaseIdInput.value = '';
-    
+
   } catch (error) {
     showError(error.message || 'Error al validar la configuración');
   } finally {
@@ -250,37 +310,37 @@ async function handleOnboardingSubmit(e) {
  */
 async function handleSaveURL() {
   if (isLoading) return;
-  
+
   setLoading(true);
   hideStatus();
-  
+
   try {
     // Obtener perfil seleccionado
     const profile = await getSelectedProfile();
-    
+
     if (!profile) {
       showStatus('Error: No hay perfil seleccionado', 'error');
       return;
     }
-    
+
     // Obtener URL y título de la pestaña actual
     const tab = await getCurrentTab();
     const url = tab.url;
     const title = tab.title;
-    
+
     // Obtener label seleccionado
     const selectedLabel = labelSelect.value || null;
-    
+
     // Extraer dominio para saved_from
     const domain = extractDomain(url);
-    
+
     // Verificar que todas las propiedades requeridas existen antes de crear la página
     try {
       const propertiesCheck = await checkDatabaseProperties(profile.apiKey, profile.databaseId);
-      
+
       if (!propertiesCheck.hasAll && propertiesCheck.missing.length > 0 || propertiesCheck.needsRename) {
         await addMissingProperties(profile.apiKey, profile.databaseId, propertiesCheck.missing, propertiesCheck.titlePropertyName, propertiesCheck.needsRename);
-        
+
         // Si se renombró, actualizar el titlePropertyName del perfil
         if (propertiesCheck.needsRename) {
           profile.titlePropertyName = 'name';
@@ -291,11 +351,11 @@ async function handleSaveURL() {
       console.error('Error verificando propiedades:', error);
       // Continuar de todas formas, pero puede fallar al crear la página
     }
-    
+
     // Obtener screenshot del storage y subirla directamente a Notion
     let thumbnailUploadId = null;
     const storage = await chrome.storage.local.get(['pendingScreenshot', 'screenshotUrl']);
-    
+
     if (storage.pendingScreenshot && storage.screenshotUrl === url) {
       try {
         // Subir la imagen directamente a Notion
@@ -307,15 +367,15 @@ async function handleSaveURL() {
         // Continuar sin thumbnail si falla, pero no bloquear el guardado de la URL
       }
     }
-    
+
     // Crear página en Notion
     await createPage(profile.apiKey, profile.databaseId, url, title, selectedLabel, profile.titlePropertyName, domain, thumbnailUploadId);
-    
+
     showStatus('¡URL guardada exitosamente en Notion!', 'success');
-    
+
     // Actualizar URL mostrada
     currentUrlElement.textContent = url;
-    
+
   } catch (error) {
     showStatus(`Error: ${error.message}`, 'error');
   } finally {
@@ -359,13 +419,13 @@ async function captureScreenshot() {
     if (!tab || !tab.id) {
       return;
     }
-    
+
     // Capturar screenshot de la pestaña visible
     const dataUrl = await chrome.tabs.captureVisibleTab(null, {
       format: 'png',
       quality: 90
     });
-    
+
     // Guardar screenshot temporalmente en storage
     await chrome.storage.local.set({
       pendingScreenshot: dataUrl,
@@ -384,18 +444,18 @@ async function captureScreenshot() {
 async function loadLabelOptions() {
   try {
     const profile = await getSelectedProfile();
-    
+
     if (!profile) {
       labelSelect.innerHTML = '<option value="">Sin categoría</option>';
       return;
     }
-    
+
     // Limpiar opciones existentes (excepto "Sin categoría")
     labelSelect.innerHTML = '<option value="">Sin categoría</option>';
-    
+
     // Obtener opciones de label desde Notion
     const options = await getLabelOptions(profile.apiKey, profile.databaseId, profile.id);
-    
+
     // Agregar opciones al select
     options.forEach(option => {
       const optionElement = document.createElement('option');
@@ -430,12 +490,12 @@ function hideError() {
  */
 function showStatus(message, type = 'success') {
   statusMessage.textContent = message;
-  
+
   // Mapear tipos a clases de CSS
   let notificationClass = 'success';
   if (type === 'error') notificationClass = 'error';
   if (type === 'loading') notificationClass = 'loading';
-  
+
   statusMessage.className = `notification ${notificationClass}`;
   statusMessage.classList.remove('hidden');
 }
@@ -453,28 +513,38 @@ function hideStatus() {
 /**
  * Establece el estado de carga
  */
-function setLoading(loading) {
+function setLoading(loading, callToActionId = '') {
   isLoading = loading;
+  // Deshabilitar botones durante la carga
   saveConfigBtn.disabled = loading;
   saveUrlBtn.disabled = loading;
-  
+  // Actualizar apariencia de los botones
   if (loading) {
     saveConfigBtn.classList.add('loading');
     saveUrlBtn.classList.add('loading');
-    
+
     // Guardar texto original si no existe
     if (!saveConfigBtn.dataset.originalText) saveConfigBtn.dataset.originalText = saveConfigBtn.textContent;
     if (!saveUrlBtn.dataset.originalText) saveUrlBtn.dataset.originalText = saveUrlBtn.textContent;
-    
-    saveConfigBtn.textContent = 'Validando...';
-    saveUrlBtn.textContent = 'Guardando...';
+
+    // Cambiar texto a "Cargando..."
+    saveConfigBtnLoader.classList.remove('hidden');
+    saveConfigBtnText.textContent = 'Validando...';
+    // Cambiar texto a "Guardando..."
+    saveUrlBtnLoader.classList.remove('hidden');
+    saveUrlBtnText.textContent = 'Guardando...';
   } else {
     saveConfigBtn.classList.remove('loading');
     saveUrlBtn.classList.remove('loading');
-    
     // Restaurar texto original
-    if (saveConfigBtn.dataset.originalText) saveConfigBtn.textContent = saveConfigBtn.dataset.originalText;
-    if (saveUrlBtn.dataset.originalText) saveUrlBtn.textContent = saveUrlBtn.dataset.originalText;
+    const restoreState = (btn, textElem, loaderElem) => {
+      if (btn.dataset.originalText) {
+        textElem.textContent = btn.dataset.originalText;
+        loaderElem.classList.add('hidden');
+      }
+    };
+    restoreState(saveConfigBtn, saveConfigBtnText, saveConfigBtnLoader);
+    restoreState(saveUrlBtn, saveUrlBtnText, saveUrlBtnLoader);
   }
 }
 
@@ -489,21 +559,21 @@ async function renderProfiles() {
   const profiles = await getProfiles();
   const selectedProfileId = (await chrome.storage.local.get(['selectedProfileId'])).selectedProfileId;
   const profileList = document.getElementById('profile-list');
-  
+
   if (!profileList) return;
-  
+
   profileList.innerHTML = '';
-  
+
   for (const profile of profiles) {
     const a = document.createElement('a');
-    
+
     if (profile.id === selectedProfileId) {
       a.classList.add('active');
     }
-    
+
     const emoji = profile.emoji || '🔲';
     const name = profile.name || 'Sin nombre';
-    
+
     // Estructura interna
     a.innerHTML = `
       <span style="display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap;">
@@ -512,21 +582,21 @@ async function renderProfiles() {
       </span>
       <button type="button" class="delete-profile-btn" data-profile-id="${profile.id}">&times;</button>
     `;
-    
+
     // Click para seleccionar perfil (delegado al anchor, excluyendo el botón delete)
     a.addEventListener('click', async (e) => {
       // Si el click fue en el botón de borrar, no seleccionar
       if (e.target.closest('.delete-profile-btn')) return;
       await selectProfile(profile.id);
     });
-    
+
     // Click para eliminar perfil
     const deleteBtn = a.querySelector('.delete-profile-btn');
     deleteBtn.addEventListener('click', async (e) => {
       e.stopPropagation(); // Prevenir selección
       await handleDeleteProfile(profile.id);
     });
-    
+
     const li = document.createElement('li');
     li.appendChild(a);
     profileList.appendChild(li);
@@ -548,18 +618,18 @@ async function selectProfile(profileId) {
 async function handleDeleteProfile(profileId) {
   const profiles = await getProfiles();
   const profile = profiles.find(p => p.id === profileId);
-  
+
   if (!profile) return;
-  
+
   // Confirmar eliminación
   const confirmed = confirm(`¿Estás seguro de que deseas eliminar el perfil "${profile.name || 'Sin nombre'}"?`);
   if (!confirmed) return;
-  
+
   await deleteProfile(profileId);
-  
+
   // Verificar si quedan perfiles después de eliminar
   const remainingProfiles = await getProfiles();
-  
+
   if (remainingProfiles.length === 0) {
     // No quedan perfiles, mostrar onboarding
     showOnboardingView();
@@ -591,7 +661,7 @@ function closeAddProfileModal() {
   const modal = document.getElementById('add-profile-modal');
   const form = document.getElementById('add-profile-form');
   const errorDiv = document.getElementById('modal-error');
-  
+
   if (modal) {
     modal.classList.remove('active');
   }
@@ -609,22 +679,22 @@ function closeAddProfileModal() {
  */
 async function handleAddProfileSubmit(e) {
   e.preventDefault();
-  
+
   const apiKeyInput = document.getElementById('modal-api-key');
   const dbIdInput = document.getElementById('modal-db-id');
   const errorDiv = document.getElementById('modal-error');
-  
+
   const apiKey = apiKeyInput.value.trim();
   const databaseId = dbIdInput.value.trim();
-  
+
   if (!apiKey || !databaseId) {
     showModalError('modal-error', 'Por favor, completa todos los campos');
     return;
   }
-  
+
   try {
     showModalError('modal-error', '', true); // Limpiar errores
-    
+
     // Validar configuración de Notion
     const validationResult = await validateNotionConfig(apiKey, databaseId);
 
@@ -633,10 +703,10 @@ async function handleAddProfileSubmit(e) {
 
     // Obtener metadatos de la base de datos
     const metadata = await getDatabaseMetadata(apiKey, databaseId, profileId, { forceRefresh: true });
-    
+
     // Obtener opciones de categorías
     const labelOptions = await getLabelOptions(apiKey, databaseId, profileId);
-    
+
     const profile = {
       id: profileId,
       apiKey: apiKey,
@@ -646,18 +716,18 @@ async function handleAddProfileSubmit(e) {
       titlePropertyName: validationResult.titlePropertyName || 'name',
       labelOptions: labelOptions
     };
-    
+
     // Guardar perfil
     await saveProfile(profile);
     await setSelectedProfile(profileId);
-    
+
     // Actualizar vista
     await renderProfiles();
     await loadLabelOptions();
-    
+
     // Cerrar modal
     closeAddProfileModal();
-    
+
   } catch (error) {
     showModalError('modal-error', error.message || 'Error al agregar perfil');
   }
@@ -673,20 +743,20 @@ async function handleAddProfileSubmit(e) {
 async function openSettingsModal() {
   const modal = document.getElementById('settings-modal');
   const profile = await getSelectedProfile();
-  
+
   if (!profile) return;
-  
+
   // Pre-llenar los campos con los datos del perfil actual
   const apiKeyInput = document.getElementById('settings-api-key');
   const dbIdInput = document.getElementById('settings-db-id');
-  
+
   if (apiKeyInput) {
     apiKeyInput.value = profile.apiKey;
   }
   if (dbIdInput) {
     dbIdInput.value = profile.databaseId;
   }
-  
+
   if (modal) {
     modal.classList.add('active');
   }
@@ -699,7 +769,7 @@ function closeSettingsModal() {
   const modal = document.getElementById('settings-modal');
   const form = document.getElementById('settings-form');
   const errorDiv = document.getElementById('settings-error');
-  
+
   if (modal) {
     modal.classList.remove('active');
   }
@@ -717,32 +787,32 @@ function closeSettingsModal() {
  */
 async function handleSettingsSubmit(e) {
   e.preventDefault();
-  
+
   const apiKeyInput = document.getElementById('settings-api-key');
   const dbIdInput = document.getElementById('settings-db-id');
-  
+
   const apiKey = apiKeyInput.value.trim();
   const databaseId = dbIdInput.value.trim();
-  
+
   if (!apiKey || !databaseId) {
     showModalError('settings-error', 'Por favor, completa todos los campos');
     return;
   }
-  
+
   try {
     showModalError('settings-error', '', true); // Limpiar errores
-    
+
     // Validar nueva configuración
     const validationResult = await validateNotionConfig(apiKey, databaseId);
-    
+
     // Obtener perfil actual
     const profile = await getSelectedProfile();
     if (!profile) return;
-    
+
     // Obtener nuevos metadatos
     const metadata = await getDatabaseMetadata(apiKey, databaseId, profile.id, { forceRefresh: true });
     const labelOptions = await getLabelOptions(apiKey, databaseId, profile.id);
-    
+
     // Actualizar perfil
     profile.apiKey = apiKey;
     profile.databaseId = databaseId;
@@ -750,17 +820,17 @@ async function handleSettingsSubmit(e) {
     profile.emoji = metadata.emoji;
     profile.titlePropertyName = validationResult.titlePropertyName || 'name';
     profile.labelOptions = labelOptions;
-    
+
     // Guardar cambios
     await saveProfile(profile);
-    
+
     // Actualizar vista
     await renderProfiles();
     await loadLabelOptions();
-    
+
     // Cerrar modal
     closeSettingsModal();
-    
+
   } catch (error) {
     showModalError('settings-error', error.message || 'Error al guardar cambios');
   }
@@ -775,26 +845,26 @@ async function handleSettingsSubmit(e) {
  */
 async function handleRefresh() {
   const refreshBtn = document.getElementById('refresh-btn');
-  
+
   if (isLoading) return;
-  
+
   try {
     isLoading = true;
     if (refreshBtn) {
       refreshBtn.classList.add('loading');
     }
-    
+
     showStatus('Actualizando perfiles...', 'loading');
-    
+
     // Actualizar metadatos de todos los perfiles
     await refreshAllProfilesMetadata();
-    
+
     // Actualizar vista
     await renderProfiles();
     await loadLabelOptions();
-    
+
     showStatus('¡Perfiles actualizados exitosamente!', 'success');
-    
+
   } catch (error) {
     showStatus(`Error al actualizar: ${error.message}`, 'error');
   } finally {
