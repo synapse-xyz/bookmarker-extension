@@ -48,6 +48,19 @@ const labelSelect = document.getElementById('label-select');
 // Estado
 let isLoading = false;
 
+// Iconos del Sidebar
+const SIDEBAR_ICONS = {
+  COLLAPSED: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              class="icon icon-tabler icons-tabler-outline icon-tabler-layout-bottombar-expand">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M20 6v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2" />
+              <path d="M20 15h-16" />
+              <path d="M14 10l-2 -2l-2 2" />
+            </svg>`, // Mostrar cuando está colapsado (para abrir configuración)
+  EXPANDED: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-layout-bottombar-collapse"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 6v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2" /><path d="M20 15h-16" /><path d="M14 8l-2 2l-2 -2" /></svg>`   // Mostrar cuando está expandido (para cerrar)
+};
+
 // Inicialización
 document.addEventListener('DOMContentLoaded', async () => {
   // Capturar screenshot antes de mostrar cualquier vista
@@ -119,6 +132,8 @@ function setupEventListeners() {
   const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
   if (sidebarToggleBtn) {
     sidebarToggleBtn.addEventListener('click', toggleSidebarActions);
+    // Inicializar icono (asumiendo estado inicial colapsado)
+    updateSidebarToggleIcon(true);
   }
 
   // Onboarding inputs persistence
@@ -194,22 +209,34 @@ function setupEventListeners() {
   }
 }
 
+function updateSidebarToggleIcon(isCollapsed) {
+  const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+  if (sidebarToggleBtn) {
+    sidebarToggleBtn.innerHTML = isCollapsed ? SIDEBAR_ICONS.COLLAPSED : SIDEBAR_ICONS.EXPANDED;
+  }
+}
+
 /**
  * Alterna la visibilidad de las acciones del sidebar
  */
 function toggleSidebarActions() {
   const sidebarActions = document.getElementById('sidebar-actions');
+
   if (sidebarActions) {
     const isCollapsed = sidebarActions.classList.contains('collapsed');
-    
+
     if (isCollapsed) {
       // Expandir
       sidebarActions.classList.remove('collapsed');
       sidebarActions.style.display = 'flex';
+      updateSidebarToggleIcon(false);
     } else {
       // Colapsar
       sidebarActions.classList.add('collapsed');
       sidebarActions.style.display = 'none';
+      updateSidebarToggleIcon(true);
+      sidebarActions.style.display = 'none';
+      if (sidebarToggleBtn) sidebarToggleBtn.innerHTML = '⚙️'; // Emoji para expandir/config
     }
   }
 }
