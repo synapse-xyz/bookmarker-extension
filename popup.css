@@ -33,6 +33,7 @@
   --error-color: #d9534f;
   --success-color: #5cb85c;
   --white: #ffffff;
+  --disabled-bg: #ededed;
   
   /* Spacing */
   --space-xs: 4px;
@@ -59,7 +60,7 @@ body {
 /* Helpers */
 .hidden { display: none !important; }
 .full-width { width: 100%; }
-.mt-4 { margin-top: var(--space-lg); }
+.mt-4 { margin-top: var(--space-md); }
 .mb-2 { margin-bottom: var(--space-sm); }
 
 /* Layout */
@@ -194,10 +195,17 @@ body {
   overflow-y: auto;
 }
 
+.content-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+   margin-bottom: var(--space-md);
+  align-items: center;
+}
+
 .content-title {
   font-size: 1.25rem;
   font-weight: 600;
-  margin-bottom: var(--space-md);
   color: var(--primary);
 }
 
@@ -276,13 +284,13 @@ body {
   background-color: var(--primary-hover);
 }
 
-.button.secondary.,  .refresh-button-container > button{
+.button.secondary,  .refresh-button-container > button{
   background-color: var(--sidebar-bg);
   border-color: var(--almond-silk);
   color: var(--taupe-gray);
 }
 
-.button.secondary:hover, .refresh-button-container > button{
+.button.secondary:hover, .refresh-button-container > button:hover{
   background-color: var(--bone);
   color: var(--carbon-black);
 }
@@ -365,7 +373,7 @@ body {
 .notification {
   padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-sm);
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
   font-size: 0.9rem;
 }
 
@@ -389,26 +397,20 @@ body {
 
 /* Components: URL Preview */
 .url-preview-box {
-  background-color: var(--white);
-  padding: var(--space-md);
+  background-color: var(--disabled-bg);
+  padding: var(--space-sm) var(--space-md);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
   word-break: break-all;
 }
 
 .url-text {
-  color: #666;
+  color: var(--taupe-gray);
+  opacity: 0.7;
   font-size: 0.85rem;
 }
 
-/* Refresh Button Position */
-.refresh-button-container {
-  position: absolute;
-  top: 10px;
-  right: 15px;
-  z-index: 10;
-}
 .shadow {
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
