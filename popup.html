@@ -32,8 +32,8 @@
           <div class="form-group">
             <label class="label">Database ID</label>
             <div class="control">
-              <input class="input" type="text" id="database-id"
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+              <input class="input" type="text" id="database-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                required>
             </div>
             <p class="help">El ID de tu base de datos (UUID)</p>
           </div>
@@ -42,7 +42,20 @@
 
           <div class="form-actions">
             <button type="submit" id="save-config-btn" class="button primary full-width">
-              Guardar Configuración
+              <span id="save-config-btn-text">Guardar Configuración</span>
+              <svg xmlns="http://www.w3.org/2000/svg" id="save-config-btn-loader" width="24" height="24"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-loader loader hidden">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M12 6l0 -3" />
+                <path d="M16.25 7.75l2.15 -2.15" />
+                <path d="M18 12l3 0" />
+                <path d="M16.25 16.25l2.15 2.15" />
+                <path d="M12 18l0 3" />
+                <path d="M7.75 16.25l-2.15 2.15" />
+                <path d="M6 12l-3 0" />
+                <path d="M7.75 7.75l-2.15 -2.15" />
+              </svg>
             </button>
           </div>
         </form>
@@ -69,28 +82,74 @@
         </div>
 
         <div class="sidebar-footer">
-          <button id="add-profile-btn" class="button small full-width mb-2" title="Añadir perfil">
-            <span class="icon">➕</span> Añadir
+          <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" title="Mostrar opciones">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              class="icon icon-tabler icons-tabler-outline icon-tabler-layout-bottombar-expand">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M20 6v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2" />
+              <path d="M20 15h-16" />
+              <path d="M14 10l-2 -2l-2 2" />
+            </svg>
           </button>
-          <button id="config-btn" class="button small full-width secondary" title="Configuración">
-            <span class="icon">⚙️</span> Ajustes
-          </button>
+          <div id="sidebar-actions" class="sidebar-actions collapsed">
+            <button id="add-profile-btn" class="button full-width secondary" title="Añadir perfil">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="icon icon-tabler icons-tabler-outline icon-tabler-database-plus">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M4 6c0 1.657 3.582 3 8 3s8 -1.343 8 -3s-3.582 -3 -8 -3s-8 1.343 -8 3" />
+                <path d="M4 6v6c0 1.657 3.582 3 8 3c1.075 0 2.1 -.08 3.037 -.224" />
+                <path d="M20 12v-6" />
+                <path d="M4 12v6c0 1.657 3.582 3 8 3c.166 0 .331 -.002 .495 -.006" />
+                <path d="M16 19h6" />
+                <path d="M19 16v6" />
+              </svg> Añadir
+            </button>
+            <button id="config-btn" class="button full-width secondary" title="Configuración">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="icon icon-tabler icons-tabler-outline icon-tabler-database-cog">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M4 6c0 1.657 3.582 3 8 3s8 -1.343 8 -3s-3.582 -3 -8 -3s-8 1.343 -8 3" />
+                <path d="M4 6v6c0 1.657 3.582 3 8 3c.21 0 .42 -.003 .626 -.01" />
+                <path d="M20 11.5v-5.5" />
+                <path d="M4 12v6c0 1.657 3.582 3 8 3" />
+                <path d="M17.001 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                <path d="M19.001 15.5v1.5" />
+                <path d="M19.001 21v1.5" />
+                <path d="M22.032 17.25l-1.299 .75" />
+                <path d="M17.27 20l-1.3 .75" />
+                <path d="M15.97 17.25l1.3 .75" />
+                <path d="M20.733 20l1.3 .75" />
+              </svg> Editar perfil
+            </button>
+          </div>
         </div>
       </div>
 
       <!-- Main Content -->
       <div class="content">
         <!-- Refresh Button -->
-        <div class="refresh-button-container">
-          <button id="refresh-btn" class="button icon-only rounded shadow" title="Actualizar metadatos">
-            ↻
-          </button>
-        </div>
+        <div class="content-header">
+          <h1 class="content-title">Guardar URL</h1>
 
-        <h1 class="content-title">Guardar URL</h1>
+          <div class="refresh-button-container">
+            <button id="refresh-btn" class="button icon-only rounded shadow" title="Actualizar metadatos">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="icon icon-tabler icons-tabler-outline icon-tabler-reload">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M19.933 13.041a8 8 0 1 1 -9.925 -8.788c3.899 -1 7.935 1.007 9.425 4.747" />
+                <path d="M20 4v5h-5" />
+              </svg>
+            </button>
+          </div>
+        </div>
 
         <div id="status-message" class="notification hidden"></div>
 
+        <label class="label">URL Actual</label>
         <div class="url-preview-box">
           <p class="url-text" id="current-url">Cargando URL...</p>
         </div>
@@ -107,7 +166,20 @@
         </div>
 
         <button id="save-url-btn" class="button primary full-width mt-4">
-          Guardar en Notion
+          <span id="save-url-btn-text">Guardar en Notion</span>
+          <svg xmlns="http://www.w3.org/2000/svg" id="save-url-btn-loader" width="24" height="24" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            class="icon icon-tabler icons-tabler-outline icon-tabler-loader loader hidden">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+            <path d="M12 6l0 -3" />
+            <path d="M16.25 7.75l2.15 -2.15" />
+            <path d="M18 12l3 0" />
+            <path d="M16.25 16.25l2.15 2.15" />
+            <path d="M12 18l0 3" />
+            <path d="M7.75 16.25l-2.15 2.15" />
+            <path d="M6 12l-3 0" />
+            <path d="M7.75 7.75l-2.15 -2.15" />
+          </svg>
         </button>
       </div>
     </div>
